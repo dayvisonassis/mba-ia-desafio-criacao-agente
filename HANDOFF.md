@@ -43,13 +43,13 @@ _Atualizado em 2026-10-20, depois das Tasks 10 e 11 e da revisão final da branc
 | 9 | Suíte de integração (pilha real, Gemini falso) | **concluída** | `5328874` e `ed18730` (correção da revisão: a checagem de vazamento ignora ids do ADK) |
 | 10 | Roteiro do avaliador (modelo real) | **concluída** | `2f25c93`, `9518cad` e `8aa7822`; 3 rodadas seguidas em PASS |
 | 11 | README da entrega | **concluída** | `f176c1d` e `0757695`; `--so-readme` em PASS |
-| 12 | Finalização (merge e push, com autorização) | **aguarda o usuário** | revisão final feita; correções em `f2e9f75`..`8f5785c` |
+| 12 | Finalização (merge e push, com autorização) | **aguarda o usuário** | revisão final feita; correções em `f2e9f75`..`8f5785c`; passo 8 em `5b05e59` |
 
 **Estado do repositório:**
 - Branch de trabalho: `feat/assistente-aurora`, criada a partir de `main` (`be87e1d`). A `main` continua intacta.
 - `uv` 0.13.3 instalado em `C:\Users\dayvi\.local\bin`. Em shells abertos antes da instalação ele não está no PATH: use
   `export PATH="$HOME/.local/bin:$PATH"` (Bash) ou `$env:Path = "$env:USERPROFILE\.local\bin;$env:Path"` (PowerShell).
-- `.venv` com Python 3.12.15 e `google-adk` 2.12.0. `uv run pytest`: 151 passed. Rode sem `-W error` (ver Task 5 na seção 6).
+- `.venv` com Python 3.12.15 e `google-adk` 2.12.0. `uv run pytest`: 152 passed. Rode sem `-W error` (ver Task 5 na seção 6).
 - **Revisão final da branch** (Opus): "pronta para merge com correções". As correções vieram numa rodada única
   (`f2e9f75`..`8f5785c`): novas tentativas de ~90 s para o limite por minuto, exemplo neutro de horário na instrução do
   regulamento, endurecimento de `acao_executada`, hífen em `validar_area`, `executescript`, `.gitignore` com `.env.*` e
@@ -229,7 +229,8 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
   uuids e `call_<n>` casam o regex por acaso.
 - **Observado nas rodadas:** a regra (d), não repetir o apartamento alegado, foi aplicada em `9518cad`. Em 2 das 3 rodadas
   finais, no passo 8 (repetir o pedido negado no passo 7), o especialista de reservas respondeu com texto em vez de chamar
-  `reservar_area`; o "Sim, pode seguir." resolveu. É variação do modelo, levada ao usuário como resíduo da revisão final.
+  `reservar_area`; o "Sim, pode seguir." resolveu. A pedido do usuário, a instrução de reservas ganhou a regra "pedido repetido
+  depois de negado é pedido novo" (`5b05e59`, revisada). Nas 3 rodadas seguintes o fallback não foi usado nenhuma vez.
 - **Pontos fracos das instruções a observar com o modelo real** (achados menores da revisão da Task 6; as frases de correção estão
   no ledger): o especialista perguntar "Deseja confirmar?" depois de ver a data livre, em vez de chamar `reservar_area`; o
   especialista do regulamento escrever a pergunta reescrita como texto e perder o "20h" do passo 12; o "pode liberar direto" do
@@ -320,3 +321,7 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
     papel (Haiku, Sonnet ou Opus). Ficou em aberto se ele prefere Opus em tudo.
   - Próximo passo: **Task 12**, com três decisões do usuário: o resíduo do passo 8 (aplicar ou não uma frase na instrução de
     reservas), se o `HANDOFF.md` fica no repositório entregue, e a autorização do merge na `main` e do push.
+- **2026-10-20, decisões da Task 12.** O usuário pediu a regra do passo 8 (feita em `5b05e59`, revisada, 3 rodadas sem fallback) e
+  decidiu manter o `HANDOFF.md` no repositório entregue. Sugestão do coordenador para a integração: merge local na `main` por
+  avanço de ponteiro (a `main` continua em `be87e1d`), suíte sobre o resultado, push da `main` e, se o usuário quiser, apagar a
+  branch de feature local e remota. Aguarda a autorização explícita do usuário.
