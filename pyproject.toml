@@ -22,4 +22,5 @@ dev = ["pytest", "httpx"]
 testpaths = ["tests"]
 filterwarnings = [
     'ignore:\[EXPERIMENTAL\] feature FeatureName.TOOL_CONFIRMATION:UserWarning',
+    'ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning',
 ]
