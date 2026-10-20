@@ -326,6 +326,7 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
   avanço de ponteiro (a `main` continua em `be87e1d`), suíte sobre o resultado, push da `main` e, se o usuário quiser, apagar a
   branch de feature local e remota. Aguarda a autorização explícita do usuário.
 - **2026-10-20, Task 12.** Com autorização explícita do usuário: merge por avanço de ponteiro da `feat/assistente-aurora` na `main`
-  (`be87e1d`..`0f65377`), suíte sobre o resultado (152 passed, `--so-readme` em PASS, `dados/` intacto) e push da `main`. A branch
-  de feature foi mantida, local e no `origin` (lá ainda em `d214d2a`). O ledger da execução, fora do Git, continua em
+  (`be87e1d`..`0f65377`), suíte sobre o resultado (152 passed, `--so-readme` em PASS, `dados/` intacto) e push da `main`. Depois de
+  confirmar que a `main` contém todos os commits, a `origin/feat/assistente-aurora` foi apagada a pedido do usuário; a branch
+  local continua. O ledger da execução, fora do Git, continua em
   `.superpowers/sdd/2026-10-19-assistente-aurora/progress.md`, com todas as rulings e os achados menores adiados.
