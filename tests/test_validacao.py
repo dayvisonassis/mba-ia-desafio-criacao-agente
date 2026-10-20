@@ -43,6 +43,13 @@ def test_validar_area_recusa(v):
         validar_area(v, AREAS)
 
 
+def test_validar_area_desconhecida_nao_repete_o_valor():
+    with pytest.raises(ErroValidacao) as erro:
+        validar_area("302", AREAS)
+    assert "302" not in str(erro.value)
+    assert "Salão de festas" in str(erro.value)
+
+
 def test_validar_nome_normaliza_espacos():
     assert validar_nome("  Joana   Ribeiro ") == "Joana Ribeiro"
 

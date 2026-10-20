@@ -166,6 +166,16 @@ def test_visitante_exige_aprovacao(banco):
     ]
 
 
+@pytest.mark.parametrize("chamar", [
+    lambda ctx: reservar_area("302", "2030-04-20", ctx),
+    lambda ctx: verificar_disponibilidade("302", "2030-04-20", ctx),
+    lambda ctx: cancelar_reserva("302", "2030-04-20", ctx),
+])
+def test_area_invalida_nao_repete_o_valor(banco, chamar):
+    r = chamar(ContextoFalso())
+    assert r["status"] == "invalida" and sem_vazamento(r)
+
+
 def test_data_invalida(banco):
     assert (
         reservar_area("quadra", "20/04/2030", ContextoFalso())["status"] == "invalida"

@@ -39,7 +39,7 @@ def validar_area(valor: object, areas: Mapping[str, str]) -> str:
             normalizar_texto(nome),
         ):
             return id_area
-    raise ErroValidacao(f"Área desconhecida: {valor!r}.")
+    raise ErroValidacao(f"Área desconhecida. As áreas são: {', '.join(areas.values())}.")
 
 
 def validar_nome(valor: object) -> str:
