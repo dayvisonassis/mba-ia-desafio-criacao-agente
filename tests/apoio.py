@@ -2,6 +2,7 @@
 
 import json
 import re
+import uuid
 from types import SimpleNamespace
 
 from google.adk.events import Event, EventActions
@@ -133,3 +134,35 @@ def ev_texto(autor, texto, thought=False) -> Event:
             parts=[types.Part(text=texto, thought=thought or None)],
         ),
     )
+
+
+class RunnerFalso:
+    """Runner de teste: grava a mensagem do usuário e emite eventos de um roteiro."""
+
+    def __init__(self, session_service):
+        self.session_service = session_service
+        self.roteiros: list[list[Event]] = []
+        self.erro_depois: int | None = None
+        self.chamadas = 0
+
+    async def run_async(self, *, user_id, session_id, new_message, **_):
+        self.chamadas += 1
+        sessao = await self.session_service.get_session(
+            app_name="aurora", user_id=user_id, session_id=session_id
+        )
+        invocacao = f"inv-{uuid.uuid4().hex[:8]}"
+        await self.session_service.append_event(
+            sessao,
+            Event(author="user", content=new_message, invocation_id=invocacao),
+        )
+        roteiro = self.roteiros.pop(0) if self.roteiros else []
+        emitidos = 0
+        if self.erro_depois == 0:
+            raise RuntimeError("falha simulada")
+        for evento in roteiro:
+            evento.invocation_id = invocacao
+            await self.session_service.append_event(sessao, evento)
+            yield evento
+            emitidos += 1
+            if self.erro_depois is not None and emitidos >= self.erro_depois:
+                raise RuntimeError("falha simulada")
