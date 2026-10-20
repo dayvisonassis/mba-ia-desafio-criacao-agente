@@ -180,7 +180,7 @@ Implementa a spec §14.1 e a D23. **Nada desta task é commitado**, exceto a se�
 - Produces, em `aurora.config`:
   - `RAIZ: Path`, a raiz do projeto, com `Path(__file__).resolve().parents[2]`;
   - `DIR_DADOS: Path`, igual a `RAIZ / "dados"`;
-  - `MODELO_PADRAO = "gemini-3.8-flash"` e `MODELO_ALTERNATIVO = "gemini-2.5-flash"` (ou o que o spike registrar);
+  - `MODELO_PADRAO = "gemini-3.5-flash-lite"` e `MODELO_ALTERNATIVO = "gemini-3.8-flash"`, como registrado no "Resultado do spike";
   - `dir_var() -> Path`: `Path(os.environ["AURORA_DIR_VAR"])` se a variável existir e não estiver vazia, senão `RAIZ / "var"`. É lida a cada chamada (D25);
   - `caminho_banco() -> Path`, igual a `dir_var() / "aurora.db"`;
   - `caminho_sessoes() -> Path`, igual a `dir_var() / "sessoes.db"`;
@@ -224,7 +224,7 @@ def test_normalizar_texto(): assert normalizar_texto("  Até   QUE Horas ") == "
 def test_nome_modelo_padrao(monkeypatch):
     monkeypatch.setenv("GEMINI_MODELO", " "); assert config.nome_modelo() == config.MODELO_PADRAO
 def test_nome_modelo_da_variavel(monkeypatch):
-    monkeypatch.setenv("GEMINI_MODELO", "gemini-2.5-flash"); assert config.nome_modelo() == "gemini-2.5-flash"
+    monkeypatch.setenv("GEMINI_MODELO", "gemini-3.8-flash"); assert config.nome_modelo() == "gemini-3.8-flash"
 def test_carregar_ambiente_forca_ai_studio(monkeypatch):
     monkeypatch.setenv("GOOGLE_GENAI_USE_VERTEXAI", "TRUE"); config.carregar_ambiente()
     assert os.environ["GOOGLE_GENAI_USE_VERTEXAI"] == "FALSE"
@@ -949,7 +949,7 @@ uv run python -c "import subprocess, pathlib; pathlib.Path('docs/enunciado.md').
     - o "por que não depende do modelo" (spec §11).
   - **Como rodar:**
     - pré-requisito `uv`;
-    - `cp .env.example .env`, com `GOOGLE_API_KEY` obrigatória e `GEMINI_MODELO` opcional, explicando a troca para `gemini-2.5-flash` (ou o alternativo registrado) se a cota acabar;
+    - `cp .env.example .env`, com `GOOGLE_API_KEY` obrigatória e `GEMINI_MODELO` opcional, explicando a troca para `gemini-3.8-flash` (a alternativa) se a cota acabar ou se o modelo padrão errar chamadas de tool, e avisando que o fluxo do avaliador faz algumas dezenas de chamadas (no plano gratuito, o `gemini-3.8-flash` tem 20 requisições por dia);
     - os comandos `uv sync`, `uv run restaurar` e `uv run api`;
     - o que a restauração faz e o que não faz (não apaga sessões);
     - `uv run pytest` e `uv run python scripts/roteiro_avaliador.py`.
@@ -973,4 +973,127 @@ uv run python -c "import subprocess, pathlib; pathlib.Path('docs/enunciado.md').
 
 ## Resultado do spike
 
-_(Preenchido na Task 1, Step 5.)_
+_Task 1, em 2026-10-20._
+
+- **Script:** `spike/spike_confirmacao.py`, descartável, com a topologia final da spec §6.
+- **Cenários:** os 16 da spec §14.1.
+- **Execução:** `uv run python spike/spike_confirmacao.py todos`, com cada fase num subprocesso novo, uma vez por modelo, na chave com faturamento (Tier 1).
+- **Artefatos:** a pasta `spike/` foi apagada no Step 6, como manda esta task. Os caminhos de `spike/` citados abaixo indicam onde estava cada evidência; os números e formatos ficam registrados nesta seção.
+
+**Nenhum cenário deu `FAIL` em nenhum dos dois modelos. A D23 não foi acionada, e a arquitetura aprovada vale como está.**
+
+### Resultados
+
+| Cenário | `gemini-3.8-flash` | `gemini-3.5-flash-lite` |
+|---|---|---|
+| 1. Área com taxa gera `adk_request_confirmation` e o turno termina | PASS | PASS |
+| 2. `false` noutro processo: nada grava, resposta `negada`, 0 chamadas | PASS | PASS |
+| 3. `true` noutro processo: 1 linha, autor `especialista_reservas`, 0 chamadas | PASS | PASS |
+| 4. Reenviar a mesma aprovação: continua 1 linha | PASS | PASS |
+| 5. Quadra: grava sem confirmação | PASS | PASS |
+| 6. Pendência antiga, regulamento, visitante, reinício, duas aprovações e texto | PASS | PASS |
+| 7. Disputa com `asyncio.gather`: 1 linha, as duas sem erro, a perdedora com `data_ocupada` | PASS | PASS |
+| 8. Resultado bruto da busca fora da sessão principal | PASS (4 sessões) | PASS (4 sessões) |
+| 9. Ordem dos eventos relidos do SQLite | PASS | PASS |
+| 10. Chamadas, tokens e cota | PASS (0×429, 0×503) | PASS (0×429, 0×503) |
+| 11. Visitante: pedido, reinício, aprovação, 1 linha | PASS | PASS |
+| 12. Texto depois de aprovação começa em `assistente_aurora` | PASS | PASS |
+| 13. Duas chamadas iguais na mesma resposta | NAO REPRODUZIDO (1 chamada nas 2 tentativas) | NAO REPRODUZIDO (1ª tentativa recusada em texto pelo principal, 2ª com 1 chamada) |
+| 14. Limites da D19 | (a) PASS; (b) NAO REPRODUZIDO (o especialista sempre fez 1 busca) | (a) e (b) NAO REPRODUZIDO (1 chamada, 1 busca) |
+| 15. Duas pendências diferentes na mesma resposta, aprovadas em sequência | PASS (2 pendências na mesma resposta, 2 linhas) | NAO REPRODUZIDO (só o salão foi pedido; a churrasqueira ficou de fora, sem aviso) |
+| 16. Piscina: "20h" e o turno termina na resposta do especialista | PASS | PASS |
+
+Os cenários 13, 14 e 15 dependem de o modelo produzir a condição, mesmo com pedido explícito e uma nova tentativa. O comportamento que o modelo não produziu fica coberto pelos eventos sintéticos da Task 7 e pela suíte de integração (D24).
+
+### Chamadas, tokens e custo
+
+| | `gemini-3.8-flash` | `gemini-3.5-flash-lite` |
+|---|---|---|
+| Chamadas ao modelo (rodada completa) | 37 | 38 |
+| Tokens: entrada / saída / pensamento | 26.228 / 1.227 / 11.093 | 25.429 / 1.182 / 0 |
+| Custo estimado (US$ 0,75 e 3,75 contra 0,30 e 2,50 por 1M; pensamento como saída; sem desconto de cache) | US$ 0,066 | US$ 0,011 |
+| Latência mediana por chamada / máxima | 3,2 s / 44 s (o pedido duplo do cenário 15 pensou longamente) | 0,9 s / 1,5 s |
+| Novas tentativas | 0 | 0 |
+
+- **Por fluxo:**
+  - aprovar ou negar: **0 chamadas**;
+  - pedido com confirmação: 2 (principal e especialista);
+  - área sem taxa: 3 (o especialista resume a resposta);
+  - pergunta ao regulamento: 3 (principal e especialista, com busca e resposta);
+  - texto simples: 1.
+- **Cuidado com essas contagens:** elas vêm das tools mínimas do spike. O sistema final faz mais chamadas: por exemplo, pela spec §6.2, o especialista de reservas confere a disponibilidade antes de reservar. A Task 10 e o README **não** devem usar esses números como estimativa de cota.
+- **Plano gratuito** (rodada anterior, sem faturamento, evidência em `spike/var_gemini-3.8-flash_cota/`): o `gemini-3.8-flash` tem limite de **20 requisições por dia**. O spike esgotou a cota no cenário 7 (`429 RESOURCE_EXHAUSTED ... limit: 20`). Uma sondagem avulsa, sem artefato gravado, sugeriu que o `gemini-3.7-flash` usa o mesmo balde: o 429 dele citava a cota do `gemini-3.8-flash`.
+
+### Formatos observados (para as Tasks 5 a 8)
+
+- **Ids:**
+  - O Gemini gera os ids das chamadas de tool no formato `call_<n>`, com sufixo numérico de tamanho variável: 5 dígitos em `call_80800` e `call_77713`, 6 em `call_227349`. Na mesma resposta, os números são consecutivos (`call_227349`, `call_227350`).
+  - O id não é único entre sessões, por isso a D18 usa a chave composta `"{session_id}:{function_call_id}"`.
+  - Os ids de confirmação são `adk-<uuid>`.
+- **Pedido com confirmação** (eventos emitidos, em ordem):
+  1. `fc:transfer_to_agent` e `fr:transfer_to_agent`, ambos com autor `assistente_aurora`;
+  2. `fc:reservar_area` do especialista;
+  3. um evento do especialista com `function_call` `adk_request_confirmation` e `longRunningToolIds=[<id da confirmação>]`. Os `args` são `{"originalFunctionCall": {"id", "name", "args"}, "toolConfirmation": {"hint", "confirmed": false}}`;
+  4. um evento do especialista com `function_response` `{"error": "This tool call requires confirmation, please approve or reject."}`, `actions.requestedToolConfirmations={<id original>: {...}}` e `skipSummarization: true`. Ele é o último, e o turno termina sem chamar o modelo e **sem texto**, então `resposta` usa o texto fixo da §9.2.
+- **Duas pendências na mesma resposta** (cenário 15, `gemini-3.8-flash`):
+  - um evento com **duas** partes `fc:reservar_area`;
+  - depois **um** evento com **duas** partes `adk_request_confirmation`, na ordem das chamadas. O `longRunningToolIds` traz os dois ids, sem ordem garantida;
+  - depois **um** evento com as **duas** `function_response` "requires confirmation" e `requestedToolConfirmations` com os dois ids originais;
+  - aprovar uma executa só aquela, e a outra continua pendente. A 9.1 listou 2 pendências, e depois 1.
+  - Duas chamadas **iguais** (cenário 13) não foram observadas. Pelo código (`core/_function_call_postprocessor.py`), o formato seria o mesmo, com `args` iguais. A D16 as reduz a uma.
+- **Aprovação ou negação:**
+  - `run_async` emite **um único** evento: a `function_response` da tool, com autor igual ao especialista que fez a chamada, `skipSummarization: true` e sem parte de texto. `resposta` usa o `mensagem` da tool.
+  - O evento do usuário com a `function_response` `adk_request_confirmation` é gravado na sessão, mas não é emitido.
+  - O `invocation_id` é o da invocação original.
+  - Na negação, o callback da §7.4 troca a resposta por `{"status": "negada", "mensagem": "Tudo bem, nada foi feito."}`.
+- **Reenvio de uma aprovação já consumida:**
+  - `run_async` termina **sem exceção e sem emitir eventos**. Só o evento do usuário é gravado, e nada executa (`_confirmation.py` marca `end_invocation`).
+  - O `409` antes do Runner (§9) é o que dá a resposta certa: sem ele, um reenvio viraria um "200 vazio" silencioso.
+  - Id desconhecido: **não foi observado no spike.** Pela leitura do código (spec §10.2, `workflow/_node_runner_utils.py`, que chama `_resolve_invocation_id_from_fr` com `strict=True`), ele faria o Runner lançar `ValueError`. É mais um motivo para o `409` vir antes do Runner.
+- **Evento final do `AgentTool` com `skip_summarization`:**
+  - É **um** evento com autor `assistente_aurora` e `role: "user"`, com duas partes:
+    1. a `function_response` de `especialista_regulamento` com `response = {"result": "<texto do especialista>"}`;
+    2. uma parte `text` com **o mesmo** texto.
+  - Também traz `skipSummarization: true` e `stateDelta={"pergunta_regulamento": "<mensagem do morador>"}`, a chave normal; a `temp:` não aparece.
+  - O turno tem só esse evento e o `fc:especialista_regulamento` anterior. O principal faz 1 chamada ao modelo.
+  - `montar_resposta` deve usar o texto **uma vez**.
+- **Duas chamadas a `especialista_regulamento` na mesma resposta** (cenário 14a, `gemini-3.8-flash`):
+  - o evento final fundido tem as partes `[fr permitida {"result": ...}, text, fr bloqueada {"status": "erro", ...}]` e `skipSummarization: true`;
+  - houve uma única execução do especialista, ou seja, uma única sessão filha.
+- **Isolamento do regulamento:**
+  - O state do especialista recebeu só `["apartamento", "pergunta_regulamento"]`; a chave `temp:` não chega.
+  - Nas 4 sessões verificadas por modelo, nenhum `buscar_no_regulamento` e nenhum texto bruto de capítulo apareceu nos eventos principais. As frases distintivas dos artigos irrelevantes também não vazaram.
+  - Nos dois modelos, o principal repassou a pergunta da piscina sem reformular.
+- **Erro de cota:**
+  - O ADK relança o 429 como `google.adk.models.google_llm._ResourceExhaustedError`, subclasse de `google.genai.errors.ClientError`, com `.code == 429`, saindo de `runner.run_async` depois das novas tentativas.
+  - Eventos já emitidos antes do erro, como o `transfer_to_agent`, ficam na sessão. Isso é relevante para a regra 200/503 da §9.
+
+### Ordem dos eventos depois da recarga
+
+- Na emissão, a ordem é sempre o `adk_request_confirmation` e depois a resposta "requires confirmation".
+- O `SqliteSessionService` relê por `ORDER BY timestamp, rowid`:
+  - quando a resposta tem timestamp menor (0,5 a 3 ms antes), a ordem **se inverte**;
+  - quando os timestamps empatam, a ordem de inserção se mantém.
+- As **duas ordens** apareceram nas duas rodadas (por exemplo, 3.8: cenários 6V e 15 invertidos; 3.5-lite: 7b invertido).
+- Em todas as confirmações respondidas (9 na rodada 3.8, 7 na 3.5-lite), a tool executou exatamente uma vez, pelo agente autor, nas duas ordens.
+- Logo, a 9.1 e o roteamento não dependem da ordem.
+
+### Confirmação de visitante (Ruling 9)
+
+O spike usou `autorizar_visitante` com `require_confirmation=True`, como manda o brief, e não a função `precisa_confirmar_visitante` da §7.3. Por isso:
+- **Caminho da função** de `require_confirmation` (portão, `FunctionTool.run_async` e validação da aprovação): provado em `reservar_area`.
+- **Roteamento e aprovação** pelo `especialista_visitantes`: provados com o booleano.
+- **Cobertura pendente:** a Task 5 (pelo `FunctionTool`) e a Task 9 (pilha completa) precisam cobrir `precisa_confirmar_visitante`.
+
+### Modelo escolhido (D8)
+
+- **Padrão:** `gemini-3.5-flash-lite`.
+- **Alternativa:** `gemini-3.8-flash`.
+
+O `gemini-3.5-flash-lite` não teve nenhum `FAIL`. Os três `NAO REPRODUZIDO` (13, 14 e 15) são aceitos pela regra de classificação. Ele também custa cerca de 6 vezes menos, responde cerca de 3,5 vezes mais rápido e não gasta tokens de pensamento, o que importa porque o avaliador roda "algumas dezenas de chamadas" com a própria chave.
+
+Os dois atendem à exigência da D8 de um modelo estável, sem "preview": a página oficial de modelos (https://ai.google.dev/gemini-api/docs/models, consultada em 2026-10-20) lista o `gemini-3.5-flash-lite` e o `gemini-3.8-flash` como **Stable**.
+
+O `gemini-2.5-flash` **sai da D8**: para esta chave ele responde `404 NOT_FOUND` ("no longer available to new users"), embora apareça na listagem de modelos.
+
+**Observação de qualidade:** com o `gemini-3.5-flash-lite`, um pedido de duas reservas numa mensagem gerou só uma pendência, sem avisar da segunda. O fluxo do avaliador não tem esse caso: o passo 3 mistura assuntos, o que a D14 cobre. Mesmo assim, a instrução do especialista de reservas (Task 6) pode pedir que ele avise quando não atender a todo o pedido.
