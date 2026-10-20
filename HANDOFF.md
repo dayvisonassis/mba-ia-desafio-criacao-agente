@@ -27,11 +27,11 @@ parecer contradizer o enunciado, **pare e pergunte ao usuário**.
 
 ## 3. Estado atual
 
-_Atualizado em 2026-10-19, ao fim da sessão de planejamento._
+_Atualizado em 2026-10-19, depois da Task 0._
 
 | Task | Descrição | Status | Commit / observação |
 |---|---|---|---|
-| 0 | Ambiente e esqueleto (`uv`, `pyproject`, ADK 2.12.0) | pendente | O `uv` **não** está instalado |
+| 0 | Ambiente e esqueleto (`uv`, `pyproject`, ADK 2.12.0) | **concluída** | `32225f3` (docs) e `04ed34a` (esqueleto); revisão aprovada |
 | 1 | Spike de confirmação (porta de decisão) | pendente | |
 | 2 | Configuração e validação | pendente | |
 | 3 | Banco, repositório e restauração | pendente | |
@@ -46,9 +46,14 @@ _Atualizado em 2026-10-19, ao fim da sessão de planejamento._
 | 12 | Finalização (merge e push, com autorização) | pendente | |
 
 **Estado do repositório:**
-- Branch `main`, só com o commit original `be87e1d`.
-- Arquivos ainda não commitados: `CLAUDE.md`, `HANDOFF.md`, `.env.example`, `.claude/skills/google-agents-cli-adk-code/` e `docs/superpowers/`. A Task 0 cria a branch e os commita.
+- Branch de trabalho: `feat/assistente-aurora`, criada a partir de `main` (`be87e1d`). A `main` continua intacta.
+- `uv` 0.13.3 instalado em `C:\Users\dayvi\.local\bin`. Em shells abertos antes da instalação ele não está no PATH: use
+  `export PATH="$HOME/.local/bin:$PATH"` (Bash) ou `$env:Path = "$env:USERPROFILE\.local\bin;$env:Path"` (PowerShell).
+- `.venv` com Python 3.12.15 e `google-adk` 2.12.0. `uv run pytest`: 1 passed.
 - O `.env` existe, com a `GOOGLE_API_KEY`, e é ignorado pelo Git.
+- O registro de progresso da skill de execução fica em `.superpowers/sdd/2026-10-19-assistente-aurora/progress.md`, ignorado pelo Git.
+  Ele guarda a varredura do plano e as decisões de execução. As que afetam tarefas futuras estão copiadas na seção 6, nas
+  Tasks 2, 8 e 9, para não se perderem.
 
 ## 4. Procedimento de cada sessão
 
@@ -102,6 +107,14 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
 - `date.fromisoformat` no Python 3.11 ou superior aceita "20300420". Por isso valide o regex `^\d{4}-\d{2}-\d{2}$` antes.
 - `dir_var()` lê `AURORA_DIR_VAR` a cada chamada (D25). Os testes usam `monkeypatch.setenv`.
 - Acrescente `AURORA_DIR_VAR=` ao `.env.example`, sem valor.
+- **Decisão de execução (Ruling 3), que complementa o plano:**
+  - `carregar_ambiente(caminho: Path | None = None)` lê o `.env` (padrão `RAIZ/.env`) com `dotenv_values`;
+  - aplica cada chave sobrescrevendo o ambiente, **exceto** `AURORA_DIR_VAR` quando ela já existe no processo;
+  - depois força `GOOGLE_GENAI_USE_VERTEXAI=FALSE`.
+
+  Sem isso, um `.env` copiado do exemplo (com `AURORA_DIR_VAR=` vazio) faria os testes gravarem no `var/` real.
+  Acrescente um teste com um `.env` temporário contendo `AURORA_DIR_VAR=` e `GOOGLE_API_KEY=x`. Ele deve confirmar que
+  um `AURORA_DIR_VAR` já definido não muda e que a chave é aplicada. Use `monkeypatch.setenv` antes, para o ambiente ser restaurado.
 
 ### Task 3: Banco, repositório e restauração
 - Use `sqlite3` com `isolation_level=None` e transações explícitas (`BEGIN IMMEDIATE` … `COMMIT`), sem `await` no meio.
@@ -147,12 +160,16 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
   Um id desconhecido faz o ADK lançar `ValueError`, que viraria `500`.
 - `criar_api` chama `config.carregar_ambiente()` logo no início, antes de montar os agentes.
 - Use só os eventos **emitidos nesta chamada** para montar `resposta` e para a conferência de 9.3, porque o ADK reaproveita o `invocation_id`.
+- **Decisão de execução (Ruling 4):** o `RunnerFalso` guarda o serviço de sessão em `self.session_service`, porque a fixture `cliente` do plano usa esse nome.
 
 ### Task 9: Suíte de integração
 - O modelo falso é uma subclasse de `BaseLlm`, injetada por `criar_app(modelo=...)`. Não faça `monkeypatch` em módulos do projeto.
 - `transfer_to_agent` recebe `agent_name`, e o `AgentTool` recebe `request`.
 - Para saber qual agente chamou o modelo, olhe as tools visíveis: só o principal vê `especialista_regulamento`.
 - O reinício é simulado montando um `SqliteSessionService`, um `Runner` e uma API novos sobre os mesmos arquivos.
+- **Decisão de execução (Ruling 5):** a fixture `pilha` usa **um único** `asyncio.Runner` por teste para todas as chamadas,
+  inclusive o `gather` da disputa e o `reiniciar()`. Locks e conexões assíncronas não podem atravessar loops diferentes.
+- O `httpx.ASGITransport` não roda o lifespan da API, então a fixture cria o esquema e os dados ela mesma.
 
 ### Task 10: Roteiro do avaliador
 - Usa o modelo real, com algumas dezenas de chamadas. Rode com a API em subprocesso e, no Windows, encerre com `terminate()`.
@@ -194,3 +211,8 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
   - A skill `google-agents-cli-adk-code` foi instalada como referência.
   - As skills do repositório `sdd-skills` foram avaliadas, e o usuário decidiu não usá-las neste projeto.
   - Nada foi implementado nem commitado.
+- **2026-10-19, Task 0** (execução com `superpowers:subagent-driven-development`; o escopo autorizado era só a Task 0).
+  - O coordenador instalou o `uv` com autorização do usuário, criou a branch `feat/assistente-aurora` e commitou os documentos (`32225f3`).
+  - O implementador fez os Steps 4 a 8 (`04ed34a`), e o revisor aprovou sem achados críticos ou importantes.
+  - A varredura do plano gerou as Rulings 1 a 5. As de impacto futuro estão na seção 6 (Tasks 2, 8 e 9).
+  - Próximo passo: **Task 1 (spike)**, que usa o Gemini real e é porta de decisão (D23).
