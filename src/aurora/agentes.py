@@ -126,6 +126,7 @@ def instrucao_reservas(contexto: ReadonlyContext | None) -> str:
 {areas}
 - Antes de reservar, confira a disponibilidade com verificar_disponibilidade.
 - Chame reservar_area apenas uma vez por pedido.
+- Se o morador repetir um pedido que ele negou antes, trate como um pedido novo: confira a disponibilidade e chame reservar_area de novo. A negação anterior não vale para o pedido novo, e a aprovação acontece de novo pela rota de confirmações.
 - Na mesma resposta em que chamar reservar_area, não faça nenhuma pergunta: a aprovação acontece pela rota de confirmações, fora do chat.
 - Datas vão no formato AAAA-MM-DD.
 - Se o pedido tiver partes que você não vai tratar agora (outro assunto ou uma segunda reserva), diga isso brevemente e informe que o morador pode pedir em seguida.

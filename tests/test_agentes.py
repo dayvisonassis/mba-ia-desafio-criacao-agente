@@ -73,6 +73,11 @@ def test_especialistas_de_dados_nao_repetem_apartamento_alegado(banco):
     assert "{" not in INSTRUCAO_VISITANTES and "}" not in INSTRUCAO_VISITANTES
 
 
+def test_instrucao_reservas_refaz_pedido_repetido_depois_de_negado(banco):
+    """Passo 8: o morador repete o pedido negado no passo 7 e o especialista deve chamar reservar_area de novo."""
+    assert "Se o morador repetir um pedido que ele negou antes" in instrucao_reservas(None)
+
+
 def test_instrucao_regulamento_exemplo_neutro_de_horario():
     """O exemplo de grafia não pode ser a resposta do passo 12 (a piscina fecha às 20h)."""
     assert "mantendo horários e valores exatamente como escritos" in INSTRUCAO_REGULAMENTO
