@@ -277,8 +277,8 @@ def buscar_no_regulamento(pergunta: str, tool_context: ToolContext) -> dict:
 - O apartamento é definido uma vez, pela API, a partir do corpo de `POST /sessoes`, que representa o morador autenticado.
   O modelo não tem como trocá-lo: nenhuma tool aceita um apartamento, e nenhum código regrava a chave `apartamento` do
   state.
-- As tools só leem e gravam dados do apartamento da sessão. Por isso, dados de outro apartamento nunca entram no resultado
-  de uma tool nem nos eventos.
+- As tools só devolvem dados do apartamento da sessão. A disponibilidade olha a agenda da área, mas devolve só livre ou
+  ocupada. Por isso, dados de outro apartamento nunca entram no resultado de uma tool nem nos eventos.
 - "Cancele a reserva do 302" chega à tool só como área e data. A busca é feita no apartamento da sessão e responde
   `nao_encontrada`, a mesma resposta de uma reserva que não existe.
 - A disponibilidade responde só livre ou ocupada. Uma data ocupada por outro apartamento é recusada como `data_ocupada`,
@@ -554,7 +554,6 @@ uv run pytest
   Runner, os agentes, as tools, os callbacks e os bancos SQLite de verdade, numa pasta temporária. Só o Gemini é trocado
   por um modelo falso que segue um roteiro.
 - Não chama o Gemini, não precisa de chave e não mexe em `var/`.
-- Rode sem `-W error`. O ADK emite um aviso experimental a cada confirmação, e o `pyproject.toml` ignora só esse aviso.
 
 ### Roteiro do avaliador (modelo real)
 
