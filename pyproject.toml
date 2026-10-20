@@ -20,3 +20,6 @@ dev = ["pytest", "httpx"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+    'ignore:\[EXPERIMENTAL\] feature FeatureName.TOOL_CONFIRMATION:UserWarning',
+]
