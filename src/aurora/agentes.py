@@ -30,6 +30,10 @@ NOME_VISITANTES = "especialista_visitantes"
 NOME_REGULAMENTO = "especialista_regulamento"
 
 CHAVE_REGULAMENTO_USADO = "temp:regulamento_consultado"
+NOMES_DAS_TOOLS = {
+    t.name
+    for t in (*FERRAMENTAS_RESERVAS, *FERRAMENTAS_VISITANTES, FERRAMENTA_REGULAMENTO)
+}
 MENSAGEM_NEGADA = "Tudo bem, nada foi feito."
 MENSAGEM_ERRO = "Não consegui concluir essa operação agora. Tente novamente em instantes."
 
@@ -93,9 +97,16 @@ def depois_da_tool_especialista(tool, args, tool_context, tool_response) -> dict
     return None
 
 
-def erro_da_tool_especialista(tool, args, tool_context, error) -> dict:
-    """Resposta fixa para erro de tool, sem o texto da exceção."""
-    logger.error("Erro na tool %s", getattr(tool, "name", tool), exc_info=error)
+def erro_da_tool_especialista(tool, args, tool_context, error) -> dict | None:
+    """Resposta fixa para erro de tool, sem o texto da exceção.
+
+    Devolve None para um nome que não é de uma tool do projeto (tool inexistente):
+    o ADK então responde com o próprio aviso de "tool não encontrada".
+    """
+    nome = getattr(tool, "name", None)
+    if nome is not None and nome not in NOMES_DAS_TOOLS:
+        return None
+    logger.error("Erro na tool %s", nome, exc_info=error)
     return {"status": "erro", "mensagem": MENSAGEM_ERRO}
 
 

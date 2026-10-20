@@ -80,3 +80,8 @@ def test_depois_da_tool_sem_confirmacao():
 def test_erro_da_tool_nao_vaza_excecao():
     r = erro_da_tool_especialista(tool=None, args={}, tool_context=ContextoFalso(), error=RuntimeError("segredo interno"))
     assert r["status"] == "erro" and "segredo" not in r["mensagem"]
+
+
+def test_erro_de_tool_inexistente_deixa_o_adk_responder():
+    r = erro_da_tool_especialista(tool=SimpleNamespace(name="transfer_to_agent"), args={}, tool_context=ContextoFalso(), error=ValueError("x"))
+    assert r is None
