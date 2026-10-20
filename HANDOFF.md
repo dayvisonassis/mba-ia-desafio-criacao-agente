@@ -27,12 +27,12 @@ parecer contradizer o enunciado, **pare e pergunte ao usuário**.
 
 ## 3. Estado atual
 
-_Atualizado em 2026-10-19, depois da Task 0._
+_Atualizado em 2026-10-20, depois da Task 1._
 
 | Task | Descrição | Status | Commit / observação |
 |---|---|---|---|
 | 0 | Ambiente e esqueleto (`uv`, `pyproject`, ADK 2.12.0) | **concluída** | `32225f3` (docs) e `04ed34a` (esqueleto); revisão aprovada |
-| 1 | Spike de confirmação (porta de decisão) | pendente | |
+| 1 | Spike de confirmação (porta de decisão) | **concluída** | `07a11c8`; nenhum `FAIL` nos dois modelos; D8 revisada (padrão `gemini-3.5-flash-lite`) |
 | 2 | Configuração e validação | pendente | |
 | 3 | Banco, repositório e restauração | pendente | |
 | 4 | Regulamento: carga e busca | pendente | |
@@ -50,6 +50,8 @@ _Atualizado em 2026-10-19, depois da Task 0._
 - `uv` 0.13.3 instalado em `C:\Users\dayvi\.local\bin`. Em shells abertos antes da instalação ele não está no PATH: use
   `export PATH="$HOME/.local/bin:$PATH"` (Bash) ou `$env:Path = "$env:USERPROFILE\.local\bin;$env:Path"` (PowerShell).
 - `.venv` com Python 3.12.15 e `google-adk` 2.12.0. `uv run pytest`: 1 passed.
+- A chave do projeto tem faturamento ativo (Tier 1) desde 2026-10-20. O spike inteiro, nos dois modelos, custou menos de US$ 0,10.
+- O resultado do spike está no fim do plano ("Resultado do spike"). A pasta `spike/` foi apagada, como manda a Task 1.
 - O `.env` existe, com a `GOOGLE_API_KEY`, e é ignorado pelo Git.
 - O registro de progresso da skill de execução fica em `.superpowers/sdd/2026-10-19-assistente-aurora/progress.md`, ignorado pelo Git.
   Ele guarda a varredura do plano e as decisões de execução. As que afetam tarefas futuras estão copiadas na seção 6, nas
@@ -78,6 +80,8 @@ _Atualizado em 2026-10-19, depois da Task 0._
 - **Task 1:** se qualquer cenário do spike der `FAIL`, **pare** (D23). Leve ao usuário o cenário, os eventos e a hipótese.
   Nenhum plano B sem aprovação, porque todo plano B muda a arquitetura (design §14.1).
 - **Troca do modelo padrão (D8):** o critério está no design e pode ser aplicado, mas avise o usuário e registre o motivo no plano.
+  A troca da Task 1 (padrão `gemini-3.5-flash-lite`, alternativa `gemini-3.8-flash`) foi feita por delegação do usuário. Uma nova
+  troca, por exemplo no roteiro da Task 10, também precisa de aviso.
 - **Qualquer mudança no contrato da API, nas garantias ou numa decisão D1 a D25:** pergunte antes.
 - **Task 12:** o merge na `main` e o `git push` precisam de autorização **explícita**. Pergunte também se o
   `HANDOFF.md` fica no repositório entregue.
@@ -102,11 +106,15 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
 - Registre na seção "Resultado do spike" do plano: a tabela, o formato do evento final do `AgentTool`, a ordem dos
   eventos depois da recarga, o número de chamadas ao modelo e o modelo escolhido. Depois **apague `spike/`**, que é descartável.
 - Se algo falhar, aplique a D23: pare e consulte o usuário.
+- **Concluída em 2026-10-20.** Nenhum `FAIL`. Os resultados, os formatos de evento e a escolha do modelo estão na seção "Resultado do spike" do plano.
 
 ### Task 2: Configuração e validação
 - `date.fromisoformat` no Python 3.11 ou superior aceita "20300420". Por isso valide o regex `^\d{4}-\d{2}-\d{2}$` antes.
 - `dir_var()` lê `AURORA_DIR_VAR` a cada chamada (D25). Os testes usam `monkeypatch.setenv`.
 - Acrescente `AURORA_DIR_VAR=` ao `.env.example`, sem valor.
+- `MODELO_PADRAO = "gemini-3.5-flash-lite"` e `MODELO_ALTERNATIVO = "gemini-3.8-flash"`. O plano já traz esses valores.
+- O ambiente do usuário tem uma `GEMINI_API_KEY` global. O google-genai avisa "Both GOOGLE_API_KEY and GEMINI_API_KEY are set" e usa a
+  `GOOGLE_API_KEY` do `.env`, o que está certo. O plano não pede nada a respeito.
 - **Decisão de execução (Ruling 3), que complementa o plano:**
   - `carregar_ambiente(caminho: Path | None = None)` lê o `.env` (padrão `RAIZ/.env`) com `dotenv_values`;
   - aplica cada chave sobrescrevendo o ambiente, **exceto** `AURORA_DIR_VAR` quando ela já existe no processo;
@@ -126,6 +134,8 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
 ### Task 4: Regulamento
 - O arquivo tem 14 capítulos e 96 artigos. A frase da piscina está na linha 157: "Aos domingos e feriados, a piscina funciona das 9h às 20h."
 - A busca devolve artigos de **um único** capítulo.
+- O spike confirmou a chave do limite da D19: o `tool_context.session.id` da sessão filha é o mesmo em toda a execução do
+  especialista e muda a cada chamada do `AgentTool`.
 
 ### Task 5: Ferramentas
 - Em todas as tools, `tool_context` é o último parâmetro. Nenhuma tool tem o parâmetro `apartamento`.
@@ -134,6 +144,9 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
   **nunca lançam exceção**: o corpo inteiro fica num `try/except`.
 - O `chamada_id` é `f"{tool_context.session.id}:{tool_context.function_call_id}"`.
 - Para os testes: a função original fica em `FunctionTool.func`, e `check_require_confirmation` é async (use `asyncio.run`).
+- O spike contou as chamadas à função de `require_confirmation`: 1 ao criar a pendência, 2 numa área sem taxa, 2 na negação e 3 na aprovação.
+- **Ruling 9:** o spike provou a via por função só em `reservar_area` (o visitante usou `require_confirmation=True`). Os testes desta
+  task precisam passar `precisa_confirmar_visitante` pelo `FunctionTool`, e a Task 9 pela pilha completa.
 
 ### Task 6: Agentes, callbacks e App
 - **O ADK chama os callbacks pelo nome dos parâmetros** (`flows/llm_flows/tools/_caller.py` e `_error_handler.py`):
@@ -148,6 +161,8 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
   pergunta do morador vai na chave normal `pergunta_regulamento`.
 - O `Gemini` está em `google.adk.models.google_llm`, e as novas tentativas usam `google.genai.types.HttpRetryOptions`.
 - `criar_app(modelo=None)`: a injeção do modelo existe só para a suíte de integração (D24).
+- Com o `gemini-3.5-flash-lite`, o pedido de duas reservas numa mensagem gerou uma só chamada, sem avisar da segunda. A instrução do
+  especialista de reservas deve pedir que ele diga quando deixa parte do pedido para depois (como a D14 já pede para dois assuntos).
 
 ### Task 7: Pendências e resposta
 - O evento de confirmação é um `function_call` `adk_request_confirmation` com `args.originalFunctionCall` (`id`, `name`, `args`).
@@ -160,6 +175,9 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
   Um id desconhecido faz o ADK lançar `ValueError`, que viraria `500`.
 - `criar_api` chama `config.carregar_ambiente()` logo no início, antes de montar os agentes.
 - Use só os eventos **emitidos nesta chamada** para montar `resposta` e para a conferência de 9.3, porque o ADK reaproveita o `invocation_id`.
+- Reenviar uma aprovação já consumida não lança exceção e não emite eventos (spike, cenário 4). Sem o `409`, a rota daria um `200` vazio.
+- O `429` sai de `run_async` como `google.adk.models.google_llm._ResourceExhaustedError`, subclasse de `google.genai.errors.ClientError`,
+  com `.code == 429`. Os eventos emitidos antes do erro ficam na sessão, o que importa para a regra 200/503 da §9.
 - **Decisão de execução (Ruling 4):** o `RunnerFalso` guarda o serviço de sessão em `self.session_service`, porque a fixture `cliente` do plano usa esse nome.
 
 ### Task 9: Suíte de integração
@@ -175,9 +193,16 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
 - Usa o modelo real, com algumas dezenas de chamadas. Rode com a API em subprocesso e, no Windows, encerre com `terminate()`.
 - O roteiro reproduz **cada verificação** do "Fluxo do avaliador" do enunciado. "302 isolado" usa o regex `(?<!\d)302(?!\d)`.
 - Uma falha aqui pede `superpowers:systematic-debugging` e um teste que reproduza a falha na task dona do código.
+- Latência medida no spike, com faturamento: `gemini-3.5-flash-lite` com mediana de 0,9 s e máximo de 1,5 s; `gemini-3.8-flash` com mediana
+  de 3,2 s e chamadas de 9 a 44 s. No plano gratuito, os `503` e as novas tentativas levavam cada chamada do 3.8-flash a 50–150 s.
+  Dê folga aos timeouts do cliente HTTP, e mais ainda se o roteiro usar a alternativa.
+- As contagens de chamadas do spike vêm das tools mínimas dele e não servem de estimativa de cota.
+- Se o `gemini-3.5-flash-lite` errar chamadas de tool de forma recorrente, o critério da D8 manda usar o `gemini-3.8-flash`. Avise o usuário.
 
 ### Task 11: README da entrega
 - Copie o enunciado para `docs/enunciado.md` **com Python** (o plano traz o comando). O redirecionamento do PowerShell muda a codificação.
+- O README avisa que o fluxo do avaliador faz algumas dezenas de chamadas, que o `gemini-3.8-flash` gratuito tem 20 requisições por dia
+  e como trocar o modelo por `GEMINI_MODELO`.
 - O README tem exatamente as seções Arquitetura, Garantias e Como rodar. As referências seguem o formato `src/aurora/x.py::funcao`, conferidas com `--so-readme`.
 
 ### Task 12: Finalização
@@ -198,8 +223,8 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
 
 - Windows 11. O shell principal é o PowerShell 5.1, e o Git Bash também está disponível.
 - O Python padrão é o 3.11 (o 3.14 também está instalado). O projeto usa o 3.12 via `uv`.
-- Modelos disponíveis na chave do projeto (2026-10-19): `gemini-3.8-flash` (padrão da D8), `gemini-2.5-flash`
-  (alternativa), entre outros.
+- Modelos (2026-10-20): `gemini-3.5-flash-lite` (padrão da D8) e `gemini-3.8-flash` (alternativa), os dois estáveis.
+  O `gemini-2.5-flash` aparece na listagem de modelos, mas responde `404` ("no longer available to new users").
 - **Nunca** imprima, copie ou commite a chave do `.env`.
 
 ## 9. Registro de sessões
@@ -216,3 +241,13 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
   - O implementador fez os Steps 4 a 8 (`04ed34a`), e o revisor aprovou sem achados críticos ou importantes.
   - A varredura do plano gerou as Rulings 1 a 5. As de impacto futuro estão na seção 6 (Tasks 2, 8 e 9).
   - Próximo passo: **Task 1 (spike)**, que usa o Gemini real e é porta de decisão (D23).
+- **2026-10-20, Task 1** (execução com `superpowers:subagent-driven-development`; o escopo autorizado era só a Task 1).
+  - A primeira rodada, no plano gratuito, parou por cota: 20 requisições por dia no `gemini-3.8-flash`, e o `gemini-2.5-flash` deu `404`.
+    Os cenários 1 a 6, 8 e 9 já tinham passado.
+  - O usuário ligou o faturamento e delegou a escolha do modelo: manter o atual se fosse o mais indicado, ou escolher um indicado e barato.
+  - O coordenador comparou preço, latência e chamadas de tool de quatro modelos (Ruling 8). O spike rodou inteiro no `gemini-3.8-flash` e
+    no `gemini-3.5-flash-lite`, sem nenhum `FAIL`. Os não reproduzidos foram 13 e 14b no 3.8; 13, 14 e 15 no lite.
+  - D8 revisada: padrão `gemini-3.5-flash-lite`, alternativa `gemini-3.8-flash`. O design e as Tasks 2 e 11 do plano foram atualizados (Ruling 10).
+  - A revisão da task aprovou a fidelidade ao design e pediu só ajustes de texto, feitos numa rodada. Um achado mandado pelo plano virou a
+    Ruling 9 (cobertura da função de confirmação de visitante nas Tasks 5 e 9). Commit `07a11c8`, e `spike/` apagado.
+  - Próximo passo: **Task 2 (configuração e validação)**, início da sessão 2 da seção 7 (Tasks 2 a 5).
