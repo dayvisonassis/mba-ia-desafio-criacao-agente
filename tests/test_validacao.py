@@ -33,6 +33,10 @@ def test_validar_area_aceita_nome_com_acento(v):
     assert validar_area(v, AREAS) == "salao-de-festas"
 
 
+def test_validar_area_hifen_com_espacos_em_volta():
+    assert validar_area("salao - de festas", AREAS) == "salao-de-festas"
+
+
 def test_validar_area_quadra_por_nome():
     assert validar_area("quadra poliesportiva", AREAS) == "quadra"
 

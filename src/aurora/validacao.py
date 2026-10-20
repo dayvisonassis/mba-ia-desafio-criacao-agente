@@ -32,10 +32,10 @@ def validar_area(valor: object, areas: Mapping[str, str]) -> str:
     """Devolve o id da área; casa pelo id ou pelo nome, sem caixa nem acento."""
     if not isinstance(valor, str):
         raise ErroValidacao("Área inválida.")
-    procurado = normalizar_texto(valor).replace("-", " ")
+    procurado = normalizar_texto(valor.replace("-", " "))
     for id_area, nome in areas.items():
         if procurado in (
-            normalizar_texto(id_area).replace("-", " "),
+            normalizar_texto(id_area.replace("-", " ")),
             normalizar_texto(nome),
         ):
             return id_area
