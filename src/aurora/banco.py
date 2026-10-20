@@ -112,8 +112,21 @@ def restaurar_dados() -> None:
         )
 
 
-def inicializar_se_necessario() -> None:
-    """Cria e carrega o banco só se ele ainda não existir."""
+def _inicializado() -> bool:
+    """Banco existente, com a tabela apartamentos e ao menos uma linha."""
     if not config.caminho_banco().exists():
+        return False
+    with closing(conectar()) as conexao:
+        tabela = conexao.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'apartamentos'"
+        ).fetchone()
+        if tabela is None:
+            return False
+        return conexao.execute("SELECT 1 FROM apartamentos LIMIT 1").fetchone() is not None
+
+
+def inicializar_se_necessario() -> None:
+    """Carrega o banco se ele não existir ou ainda não tiver dados; nunca altera um populado."""
+    if not _inicializado():
         garantir_esquema()
         restaurar_dados()

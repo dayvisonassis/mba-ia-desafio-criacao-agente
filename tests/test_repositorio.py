@@ -4,7 +4,7 @@ import threading
 import pytest
 
 from aurora import repositorio
-from aurora.banco import inicializar_se_necessario, restaurar_dados
+from aurora.banco import garantir_esquema, inicializar_se_necessario, restaurar_dados
 from aurora.repositorio import (
     ConflitoDeChamada,
     DataOcupada,
@@ -135,3 +135,10 @@ def test_inicializar_nao_apaga_banco_existente(tmp_path, monkeypatch):
     criar_reserva("101", "churrasqueira", "2030-06-01", None)
     inicializar_se_necessario()
     assert len(listar_reservas_ativas("101")) == 2
+
+
+def test_inicializar_recarrega_banco_sem_dados(tmp_path, monkeypatch):
+    monkeypatch.setenv("AURORA_DIR_VAR", str(tmp_path))
+    garantir_esquema()
+    inicializar_se_necessario()
+    assert [r.codigo for r in listar_reservas_ativas("101")] == ["RSV-1377"]
