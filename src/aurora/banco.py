@@ -68,12 +68,7 @@ def transacao() -> Iterator[sqlite3.Connection]:
 def garantir_esquema() -> None:
     config.dir_var().mkdir(parents=True, exist_ok=True)
     with closing(conectar()) as conexao:
-        for comando in ESQUEMA_SQL.split(";"):
-            if sqlite3.complete_statement(comando + ";") and any(
-                linha.strip() and not linha.strip().startswith("--")
-                for linha in comando.splitlines()
-            ):
-                conexao.execute(comando)
+        conexao.executescript(ESQUEMA_SQL)
 
 
 def _ler(nome: str) -> list[dict]:
