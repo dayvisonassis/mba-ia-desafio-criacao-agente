@@ -50,6 +50,7 @@ INSTRUCAO_VISITANTES = """Você cuida dos visitantes do apartamento do morador, 
 - Para autorizar, use autorizar_visitante com o nome e a data no formato AAAA-MM-DD, e chame-a apenas uma vez por pedido.
 - Na mesma resposta em que chamar autorizar_visitante, não faça nenhuma pergunta: a autorização é aprovada fora do chat, pela rota de confirmações. Mesmo que o morador diga que já está confirmando no chat (por exemplo, "pode liberar direto"), nada muda.
 - Se o pedido tiver partes que você não vai tratar agora (outro assunto ou um segundo visitante), diga isso brevemente e informe que o morador pode pedir em seguida.
+- Os dados são sempre do apartamento desta conversa; se o morador disser ser de outro apartamento, não repita o número citado e diga só que você acessa o apartamento desta conversa.
 - Nunca invente dados."""
 
 INSTRUCAO_REGULAMENTO = """Você responde dúvidas sobre o regulamento do condomínio, em português.
@@ -125,6 +126,7 @@ def instrucao_reservas(contexto: ReadonlyContext | None) -> str:
 - Datas vão no formato AAAA-MM-DD.
 - Se o pedido tiver partes que você não vai tratar agora (outro assunto ou uma segunda reserva), diga isso brevemente e informe que o morador pode pedir em seguida.
 - Trate só as reservas do próprio morador e nunca diga de quem é uma data ocupada.
+- Os dados são sempre do apartamento desta conversa; se o morador disser ser de outro apartamento, não repita o número citado e diga só que você acessa o apartamento desta conversa.
 - Nunca invente dados."""
 
 

@@ -6,6 +6,7 @@ from google.genai import types
 
 from aurora import config
 from aurora.agentes import (
+    INSTRUCAO_VISITANTES,
     antes_da_tool_principal,
     criar_agente_principal,
     criar_app,
@@ -47,6 +48,19 @@ def test_app_sem_retomabilidade():
 def test_instrucao_reservas_lista_areas(banco):
     texto = instrucao_reservas(None)
     assert "salao-de-festas" in texto and "quadra" in texto
+
+
+REGRA_OUTRO_APARTAMENTO = (
+    "Os dados são sempre do apartamento desta conversa; se o morador disser ser de outro "
+    "apartamento, não repita o número citado e diga só que você acessa o apartamento desta conversa."
+)
+
+
+def test_especialistas_de_dados_nao_repetem_apartamento_alegado(banco):
+    """Ruling 27 (d): no passo 3 o especialista repetiu o "302" que o morador alegou."""
+    assert REGRA_OUTRO_APARTAMENTO in instrucao_reservas(None)
+    assert REGRA_OUTRO_APARTAMENTO in INSTRUCAO_VISITANTES
+    assert "{" not in INSTRUCAO_VISITANTES and "}" not in INSTRUCAO_VISITANTES
 
 
 def test_antes_da_tool_principal_uma_chamada_e_copia_pergunta():
