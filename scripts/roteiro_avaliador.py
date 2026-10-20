@@ -55,6 +55,8 @@ IDS_GERADOS = re.compile(
 )
 CHAVE_GOOGLE = re.compile(rb"AIza[0-9A-Za-z_\-]{35}")
 REFERENCIA_README = re.compile(r"([\w./\\-]+\.py)::([A-Za-z_]\w*)")
+MARCA_ENUNCIADO = re.compile(r"^## Fluxo do avaliador[ \t]*$", re.MULTILINE)  # só o enunciado tem
+SECOES_README = ("Arquitetura", "Garantias", "Como rodar")
 
 SIM = "Sim, pode seguir."
 SALAO = "salao-de-festas"
@@ -175,14 +177,50 @@ def nomes_de_function_call(eventos: list) -> set[str]:
     return nomes
 
 
+def _e_mensagem_do_usuario(evento: object, texto: str) -> bool:
+    if not isinstance(evento, dict) or evento.get("author") != "user":
+        return False
+    return any(
+        isinstance(parte, dict) and parte.get("text") == texto
+        for parte in (evento.get("content") or {}).get("parts") or []
+    )
+
+
 def tem_mensagem_do_usuario(eventos: list, texto: str) -> bool:
-    for evento in eventos:
-        if not isinstance(evento, dict) or evento.get("author") != "user":
-            continue
-        for parte in (evento.get("content") or {}).get("parts") or []:
-            if isinstance(parte, dict) and parte.get("text") == texto:
-                return True
-    return False
+    return any(_e_mensagem_do_usuario(e, texto) for e in eventos)
+
+
+def chamadas_depois_da_mensagem(eventos: list, texto: str) -> set[str] | None:
+    """Nomes das functionCall feitas depois da última mensagem `texto` do usuário.
+
+    Devolve None se a mensagem não está nos eventos.
+    """
+    indices = [i for i, e in enumerate(eventos) if _e_mensagem_do_usuario(e, texto)]
+    if not indices:
+        return None
+    return nomes_de_function_call(eventos[indices[-1] + 1:])
+
+
+CHAVES_RESERVA = {"codigo", "area", "data"}
+CHAVES_VISITANTE = {"nome", "data"}
+
+
+def itens_no_contrato(lista: list, chaves: set[str]) -> bool:
+    """Cada item da rota de verificação tem exatamente as chaves do contrato, com texto."""
+    return all(
+        isinstance(item, dict)
+        and set(item) == chaves
+        and all(isinstance(v, str) and v for v in item.values())
+        for item in lista
+    )
+
+
+def titulos_markdown(texto: str) -> set[str]:
+    """Textos dos títulos Markdown (qualquer nível), sem diferenciar maiúsculas."""
+    return {
+        normalizar(m.group(1))
+        for m in re.finditer(r"^#{1,6}[ \t]+(.+?)[ \t#]*$", texto, re.MULTILINE)
+    }
 
 
 def frases_de_outros_capitulos() -> list[str]:
@@ -264,6 +302,9 @@ class Roteiro:
         self.codigos_criados: list[str] = []
         self.chamadas_modelo = ""
         self.sessoes: dict[str, str] = {}
+        self.leituras: dict[str, list[int]] = {}  # tipo -> [leituras, fora do contrato]
+        self.caminho_resultado = self.pasta / f"{carimbo}_resultado.json"
+        self.inicio_resumo = 0
 
     # ------------------------------------------------------------- saída e verificações
 
@@ -487,21 +528,44 @@ class Roteiro:
         self.sessoes[rotulo] = sid
         return sid
 
-    def reservas(self, apartamento: str) -> list[dict] | None:
-        r = self.chamar("GET", f"/apartamentos/{apartamento}/reservas")
+    def _verificacao(self, rota: str, tipo: str, chaves: set[str]) -> list[dict] | None:
+        """Lê uma rota de verificação e confere o contrato: 200, lista e itens com as chaves exatas."""
+        r = self.chamar("GET", rota)
+        contagem = self.leituras.setdefault(tipo, [0, 0])
+        contagem[0] += 1
         if r.status != 200 or not isinstance(r.corpo, list):
-            self.checar(f"GET /apartamentos/{apartamento}/reservas responde 200 com uma lista", False,
-                        f"status {r.status}")
+            contagem[1] += 1
+            self.checar(f"{rota} responde 200 com uma lista", False, f"status {r.status}")
             return None
+        if not itens_no_contrato(r.corpo, chaves):
+            contagem[1] += 1
+            self.checar(f"{rota}: cada item tem exatamente {sorted(chaves)}", False, dump(r.corpo)[:300])
         return r.corpo
 
+    def reservas(self, apartamento: str) -> list[dict] | None:
+        return self._verificacao(f"/apartamentos/{apartamento}/reservas", "reservas", CHAVES_RESERVA)
+
     def visitantes(self, apartamento: str) -> list[dict] | None:
-        r = self.chamar("GET", f"/apartamentos/{apartamento}/visitantes")
+        return self._verificacao(f"/apartamentos/{apartamento}/visitantes", "visitantes", CHAVES_VISITANTE)
+
+    def checar_leituras(self) -> None:
+        """Resumo do contrato das rotas de verificação lidas no fluxo (nenhuma leitura falha)."""
+        for tipo, chaves in (("reservas", CHAVES_RESERVA), ("visitantes", CHAVES_VISITANTE)):
+            total, ruins = self.leituras.get(tipo, [0, 0])
+            self.checar(
+                f"as {total} leituras de /apartamentos/{{n}}/{tipo} foram 200, com itens de chaves "
+                f"exatamente {sorted(chaves)}",
+                total > 0 and ruins == 0,
+                f"{ruins} fora do contrato",
+            )
+
+    def chamou(self, sid: str, texto: str, nomes: set[str]) -> bool:
+        """Os eventos da sessão têm, depois da mensagem `texto`, uma chamada a uma das tools."""
+        r = self.chamar("GET", f"/sessoes/{sid}/eventos")
         if r.status != 200 or not isinstance(r.corpo, list):
-            self.checar(f"GET /apartamentos/{apartamento}/visitantes responde 200 com uma lista", False,
-                        f"status {r.status}")
-            return None
-        return r.corpo
+            return False
+        feitas = chamadas_depois_da_mensagem(r.corpo, texto)
+        return bool(feitas and feitas & nomes)
 
     def eventos(self, sid: str, rotulo: str, texto_do_passo: str | None = None) -> list | None:
         """Eventos da sessão; confere o 200 e, se dado, que a mensagem do passo está neles."""
@@ -575,9 +639,12 @@ class Roteiro:
             self.aviso("a resposta repete o número 302 citado pelo morador (Ruling 27, item d)")
 
     def passo_4(self) -> None:
-        fluxo = self.enviar(self.s1, MSG_4)
+        tentou = lambda: self.chamou(self.s1, MSG_4, {"cancelar_reserva"})  # noqa: E731
+        fluxo = self.enviar(self.s1, MSG_4, concluido=tentou)
         self.fluxo_no_contrato(fluxo)
         self.resposta_nao_vazia(fluxo)
+        self.checar("o fluxo tentou o cancelamento (os eventos de S1 têm `cancelar_reserva` "
+                    "depois da mensagem)", tentou())
         reservas_302 = self.reservas("302")
         self.checar("GET /apartamentos/302/reservas ainda lista a RSV-4821",
                     "RSV-4821" in self.codigos(reservas_302))
@@ -667,10 +734,25 @@ class Roteiro:
         r = self.chamar("GET", "/sessoes/sessao-inexistente/eventos")
         self.checar("GET /sessoes/sessao-inexistente/eventos recebe 404", r.status == 404,
                     f"status {r.status}")
+        # Sondagens do contrato sem modelo: o 404 vem antes de qualquer execução.
+        r = self.chamar("POST", "/sessoes/sessao-inexistente/mensagens", {"texto": "Olá"})
+        self.checar("POST /sessoes/sessao-inexistente/mensagens (corpo válido) recebe 404",
+                    r.status == 404, f"status {r.status}")
+        r = self.chamar("POST", "/sessoes/sessao-inexistente/confirmacoes",
+                        {"id": "id-inexistente", "confirmado": True})
+        self.checar("POST /sessoes/sessao-inexistente/confirmacoes (corpo válido) recebe 404",
+                    r.status == 404, f"status {r.status}")
+        self.checar("as reservas do 101 continuam as mesmas depois das sondagens",
+                    depois is not None and self.reservas("101") == depois)
 
     def passo_10(self) -> None:
         self.s2 = self.criar_sessao("101", "S2")
-        fluxo = self.enviar(self.s2, MSG_10)
+        tentou = lambda: self.chamou(  # noqa: E731
+            self.s2, MSG_10, {"verificar_disponibilidade", "reservar_area"}
+        )
+        fluxo = self.enviar(self.s2, MSG_10, concluido=tentou)
+        self.checar("o fluxo tentou a reserva (os eventos de S2 têm `verificar_disponibilidade` ou "
+                    "`reservar_area` depois da mensagem)", tentou())
         for p in pendentes(fluxo[-1].corpo):
             if pendencia_salao({"confirmacoes_pendentes": [p]}, "2030-03-16") is None:
                 self.aviso(f"pendência inesperada no passo 10, aprovada mesmo assim: {dump(p)}")
@@ -765,14 +847,20 @@ class Roteiro:
         v101 = self.visitantes("101")
         self.checar("o 101 tem Joana Ribeiro autorizada para 2030-04-21",
                     any(v.get("nome") == "Joana Ribeiro" and v.get("data") == "2030-04-21" for v in v101 or []))
-        criadas = [str(r.get("codigo")) for r in (r101 or []) if r.get("codigo") not in CODIGOS_INICIAIS]
-        self.imprimir(f"    códigos das reservas criadas no fluxo: {criadas}")
-        self.checar("há códigos das duas reservas criadas no fluxo", len(criadas) >= 2, dump(r101))
-        self.checar("os códigos criados são diferentes entre si", len(set(criadas)) == len(criadas))
+        # As duas reservas criadas no fluxo, achadas pela área e pela data (não pelo código).
+        quadra = self.da_area(r101, "quadra", "2030-04-06")
+        salao = self.da_area(r101, SALAO, "2030-04-20")
+        criadas = [str(r.get("codigo")) for r in quadra[:1] + salao[:1]]
+        self.imprimir(f"    códigos das reservas criadas no fluxo (quadra, salão): {criadas}")
+        duas = len(quadra) == 1 and len(salao) == 1 and len(criadas) == 2
+        self.checar("há os códigos das duas reservas do fluxo (quadra 2030-04-06 e salão 2030-04-20)",
+                    duas, dump(r101))
+        self.checar("os códigos criados são diferentes entre si", duas and criadas[0] != criadas[1],
+                    dump(criadas))
         self.checar("os códigos criados são diferentes de RSV-1377, RSV-4821 e RSV-2950",
-                    not set(criadas) & CODIGOS_INICIAIS)
+                    duas and not set(criadas) & CODIGOS_INICIAIS, dump(criadas))
         self.checar("os códigos criados seguem o formato RSV-N[A-Z]{8}",
-                    bool(criadas) and all(PADRAO_CODIGO.fullmatch(c) for c in criadas), dump(criadas))
+                    duas and all(PADRAO_CODIGO.fullmatch(c) for c in criadas), dump(criadas))
         self.codigos_criados = criadas
         self.checar("o 302 continua com a RSV-4821", "RSV-4821" in self.codigos(self.reservas("302")))
 
@@ -916,11 +1004,21 @@ class Roteiro:
         readme = RAIZ / "README.md"
         if not self.checar("README.md existe", readme.is_file()):
             return
-        referencias = sorted(set(REFERENCIA_README.findall(readme.read_text(encoding="utf-8"))))
-        if not referencias:
-            self.checar("README: nenhuma referência `caminho.py::nome` para conferir", True)
-            self.aviso("o README.md não tem referências `caminho.py::nome` (ainda é o enunciado?)")
-            return
+        conteudo = readme.read_text(encoding="utf-8")
+        referencias = sorted(set(REFERENCIA_README.findall(conteudo)))
+        if MARCA_ENUNCIADO.search(conteudo):
+            # Antes da Task 11, o README ainda é o enunciado: não há referências a conferir.
+            if not referencias:
+                self.checar("README ainda é o enunciado (tem \"Fluxo do avaliador\"): sem referências "
+                            "a conferir", True)
+                self.aviso("o README.md ainda é o enunciado; as referências `caminho.py::nome` só "
+                           "são conferidas no README da entrega")
+        else:
+            titulos = titulos_markdown(conteudo)
+            for secao in SECOES_README:
+                self.checar(f"README tem a seção \"{secao}\" (título de qualquer nível)",
+                            normalizar(secao) in titulos)
+            self.checar("README da entrega tem referências `caminho.py::nome`", bool(referencias))
         for caminho, nome in referencias:
             arquivo = (RAIZ / caminho.replace("\\", "/")).resolve()
             dentro = arquivo.is_relative_to(RAIZ)
@@ -966,11 +1064,14 @@ class Roteiro:
             if self.subiu:
                 livre = self.parar_api()
                 self.checar("a API foi encerrada e a porta 8000 ficou livre", livre)
+        self.checar_leituras()
         self.checar_repositorio()
         self.checar_readme()
         self.salvar_transcricao()
         self.checar_chave_fora_da_saida()
-        return self.resumo(time.perf_counter() - inicio)
+        codigo = self.resumo(time.perf_counter() - inicio)
+        self.salvar_resultado(codigo)
+        return codigo
 
     def so_readme(self) -> int:
         self.checar_readme()
@@ -983,8 +1084,29 @@ class Roteiro:
             encoding="utf-8",
         )
 
+    def salvar_resultado(self, codigo: int) -> None:
+        """Grava, ao lado da transcrição, cada verificação, o resumo e a saída completa."""
+        self.pasta.mkdir(parents=True, exist_ok=True)
+        dados = {
+            "resultado": "PASS" if codigo == 0 else "FAIL",
+            "codigo_de_saida": codigo,
+            "pass": sum(1 for r in self.resultados if r[2]),
+            "fail": sum(1 for r in self.resultados if not r[2]),
+            "usos_do_sim": self.usos_do_sim,
+            "avisos": self.avisos,
+            "verificacoes": [
+                {"passo": p, "verificacao": d, "ok": ok, "detalhe": det}
+                for p, d, ok, det in self.resultados
+            ],
+            "resumo": self.saida[self.inicio_resumo:],
+            "saida": self.saida,
+        }
+        self.caminho_resultado.write_text(json.dumps(dados, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"Resultado gravado em {self.caminho_resultado.relative_to(RAIZ)}", flush=True)
+
     def resumo(self, duracao: float | None) -> int:
         falhas = [r for r in self.resultados if not r[2]]
+        self.inicio_resumo = len(self.saida)
         self.imprimir("\n=== Resumo ===")
         self.imprimir(f"PASS: {len(self.resultados) - len(falhas)}  FAIL: {len(falhas)}")
         for passo, descricao, _, detalhe in falhas:
@@ -999,7 +1121,8 @@ class Roteiro:
         if duracao is not None:
             por_passo = ", ".join(f"{p}: {d:.1f}s" for p, d in self.duracoes.items())
             self.imprimir(f"Tempo total: {duracao:.1f} s ({por_passo})")
-            mensagens = [c["duracao_s"] for c in self.transcricao if c["rota"].endswith("/mensagens")]
+            mensagens = [c["duracao_s"] for c in self.transcricao
+                         if c["rota"].endswith("/mensagens") and c["status"] == 200]
             if mensagens:
                 ordenadas = sorted(mensagens)
                 self.imprimir(f"Rota de mensagens: {len(mensagens)} chamadas, mediana "
