@@ -10,6 +10,7 @@ from aurora.agentes import (
     antes_da_tool_principal,
     criar_agente_principal,
     criar_app,
+    criar_modelo,
     depois_da_tool_especialista,
     erro_da_tool_especialista,
     instrucao_reservas,
@@ -38,6 +39,14 @@ def test_principal_sem_regulamento_nas_instrucoes():
     for linha in (config.DIR_DADOS / "regulamento.md").read_text(encoding="utf-8").splitlines():
         if len(linha.strip()) > 30:
             assert linha.strip() not in texto
+
+
+def test_modelo_espera_a_janela_por_minuto():
+    """Ruling 30: cerca de 90 s de espera acumulada, só para 429 e 503 (montar o modelo não chama a API)."""
+    novas_tentativas = criar_modelo().retry_options
+    assert novas_tentativas.attempts == 7
+    assert novas_tentativas.max_delay == 30.0
+    assert novas_tentativas.http_status_codes == [429, 503]
 
 
 def test_app_sem_retomabilidade():

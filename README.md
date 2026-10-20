@@ -513,6 +513,7 @@ AURORA_DIR_VAR=
   Google AI Studio.
   - O padrão é o `gemini-3.5-flash-lite`. Nos testes do projeto, ele não teve falhas e custou menos e respondeu mais
     rápido que o `gemini-3.8-flash`.
+  - Se uma mensagem responder `503` por cota ou sobrecarga do modelo, espere um minuto e envie de novo.
   - Se a cota acabar (erro `429` mesmo depois das novas tentativas) ou se o modelo padrão errar chamadas de tool com
     frequência, preencha `GEMINI_MODELO` com `gemini-3.8-flash`, a alternativa. Reinicie a API depois de mudar o `.env`.
   - Atenção: no plano gratuito, o `gemini-3.8-flash` tem só 20 requisições por dia, menos do que o fluxo do avaliador usa.

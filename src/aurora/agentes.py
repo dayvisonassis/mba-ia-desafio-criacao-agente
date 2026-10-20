@@ -62,11 +62,15 @@ INSTRUCAO_REGULAMENTO = """Você responde dúvidas sobre o regulamento do condom
 
 
 def criar_modelo() -> Gemini:
-    """Modelo Gemini com novas tentativas para os erros 429 e 503."""
+    """Modelo Gemini com novas tentativas para os erros 429 e 503.
+
+    Esperas de 2, 4, 8, 16, 30 e 30 s: cerca de 90 s, o bastante para passar a janela
+    de um limite por minuto.
+    """
     return Gemini(
         model=config.nome_modelo(),
         retry_options=types.HttpRetryOptions(
-            attempts=5, initial_delay=2.0, http_status_codes=[429, 503]
+            attempts=7, initial_delay=2.0, max_delay=30.0, http_status_codes=[429, 503]
         ),
     )
 
