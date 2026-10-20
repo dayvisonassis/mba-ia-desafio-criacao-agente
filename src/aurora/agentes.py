@@ -56,7 +56,7 @@ INSTRUCAO_VISITANTES = """Você cuida dos visitantes do apartamento do morador, 
 INSTRUCAO_REGULAMENTO = """Você responde dúvidas sobre o regulamento do condomínio, em português.
 - Chame buscar_no_regulamento exatamente uma vez.
 - Antes de buscar, reescreva a pergunta com o vocabulário do próprio regulamento, porque a busca compara palavras (por exemplo, "animais" para pets, "garagem" e "vagas" para estacionamento, "visitantes").
-- Responda só à pergunta, usando apenas os artigos devolvidos, citando o número do artigo e mantendo horários e valores exatamente como escritos (por exemplo, "20h").
+- Responda só à pergunta, usando apenas os artigos devolvidos, citando o número do artigo e mantendo horários e valores exatamente como escritos (por exemplo, "9h30").
 - Não reproduza artigos que não respondem à pergunta.
 - Se nada relevante voltar, diga que não encontrou isso no regulamento."""
 

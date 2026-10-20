@@ -6,6 +6,7 @@ from google.genai import types
 
 from aurora import config
 from aurora.agentes import (
+    INSTRUCAO_REGULAMENTO,
     INSTRUCAO_VISITANTES,
     antes_da_tool_principal,
     criar_agente_principal,
@@ -70,6 +71,13 @@ def test_especialistas_de_dados_nao_repetem_apartamento_alegado(banco):
     assert REGRA_OUTRO_APARTAMENTO in instrucao_reservas(None)
     assert REGRA_OUTRO_APARTAMENTO in INSTRUCAO_VISITANTES
     assert "{" not in INSTRUCAO_VISITANTES and "}" not in INSTRUCAO_VISITANTES
+
+
+def test_instrucao_regulamento_exemplo_neutro_de_horario():
+    """O exemplo de grafia não pode ser a resposta do passo 12 (a piscina fecha às 20h)."""
+    assert "mantendo horários e valores exatamente como escritos" in INSTRUCAO_REGULAMENTO
+    assert "20h" not in INSTRUCAO_REGULAMENTO
+    assert "{" not in INSTRUCAO_REGULAMENTO and "}" not in INSTRUCAO_REGULAMENTO
 
 
 def test_antes_da_tool_principal_uma_chamada_e_copia_pergunta():
