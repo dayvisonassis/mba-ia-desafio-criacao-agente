@@ -27,7 +27,7 @@ parecer contradizer o enunciado, **pare e pergunte ao usuário**.
 
 ## 3. Estado atual
 
-_Atualizado em 2026-10-20, depois da Task 5._
+_Atualizado em 2026-10-20, depois da Task 9._
 
 | Task | Descrição | Status | Commit / observação |
 |---|---|---|---|
@@ -37,10 +37,10 @@ _Atualizado em 2026-10-20, depois da Task 5._
 | 3 | Banco, repositório e restauração | **concluída** | `a91001e` e `52560ab` (correção da revisão: a subida recarrega um banco sem dados) |
 | 4 | Regulamento: carga e busca | **concluída** | `772e9ce`; revisão aprovada |
 | 5 | Ferramentas (tools) | **concluída** | `49ed447`; revisão aprovada (G1 e G2 sondadas pelo caminho real do ADK) |
-| 6 | Agentes, callbacks e App | pendente | |
-| 7 | Pendências e montagem da resposta | pendente | |
-| 8 | API e servidor | pendente | |
-| 9 | Suíte de integração (pilha real, Gemini falso) | pendente | |
+| 6 | Agentes, callbacks e App | **concluída** | `1cb8a35` e `a614edc` (correção da revisão: o callback de erro deixa o ADK responder tool inexistente) |
+| 7 | Pendências e montagem da resposta | **concluída** | `489ec1f`; revisão aprovada |
+| 8 | API e servidor | **concluída** | `39e1b4d` e `705e1d6` (filtro do aviso do Starlette); fumaça com o modelo real OK |
+| 9 | Suíte de integração (pilha real, Gemini falso) | **concluída** | `5328874` e `ed18730` (correção da revisão: a checagem de vazamento ignora ids do ADK) |
 | 10 | Roteiro do avaliador (modelo real) | pendente | |
 | 11 | README da entrega | pendente | |
 | 12 | Finalização (merge e push, com autorização) | pendente | |
@@ -49,11 +49,11 @@ _Atualizado em 2026-10-20, depois da Task 5._
 - Branch de trabalho: `feat/assistente-aurora`, criada a partir de `main` (`be87e1d`). A `main` continua intacta.
 - `uv` 0.13.3 instalado em `C:\Users\dayvi\.local\bin`. Em shells abertos antes da instalação ele não está no PATH: use
   `export PATH="$HOME/.local/bin:$PATH"` (Bash) ou `$env:Path = "$env:USERPROFILE\.local\bin;$env:Path"` (PowerShell).
-- `.venv` com Python 3.12.15 e `google-adk` 2.12.0. `uv run pytest`: 88 passed. Rode sem `-W error` (ver Task 5 na seção 6).
+- `.venv` com Python 3.12.15 e `google-adk` 2.12.0. `uv run pytest`: 146 passed. Rode sem `-W error` (ver Task 5 na seção 6).
 - `var/aurora.db` existe, criado pelo `uv run restaurar` da Task 3, e é ignorado pelo Git.
 - Achados menores adiados, para a revisão final triar, estão no ledger `.superpowers/sdd/2026-10-19-assistente-aurora/progress.md`
-  (linhas `minor (deferred)`). Um deles deve ser corrigido antes do merge: a mensagem `invalida` repete o argumento cru do
-  modelo (Task 5, abaixo).
+  (linhas `minor (deferred)`). A correção que estava marcada para antes do merge (a mensagem `invalida` repetia o argumento
+  do modelo) foi feita em `c25666b`, a pedido do usuário, com revisão.
 - A chave do projeto tem faturamento ativo (Tier 1) desde 2026-10-20. O spike inteiro, nos dois modelos, custou menos de US$ 0,10.
 - O resultado do spike está no fim do plano ("Resultado do spike"). A pasta `spike/` foi apagada, como manda a Task 1.
 - O `.env` existe, com a `GOOGLE_API_KEY`, e é ignorado pelo Git.
@@ -159,8 +159,7 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
 - `buscar_no_regulamento` não exige o apartamento, porque não lê dado de apartamento (Ruling 17).
 - O ADK emite um `UserWarning` "[EXPERIMENTAL] feature FeatureName.TOOL_CONFIRMATION" a cada uso da confirmação. O
   `pyproject.toml` ignora só esse aviso (Ruling 18). O `-W error` da linha de comando sobrepõe esse filtro: use `uv run pytest`.
-- **Corrigir antes do merge:** a resposta `invalida` repete o argumento cru do modelo ("Área desconhecida: '302'.",
-  `validacao.py` + `ferramentas.py`). Se o modelo puser "302" em `area`, a resposta terá um 302 isolado (passo 10).
+- **Feito (`c25666b`, Ruling 19):** a resposta `invalida` não repete mais o argumento do modelo; ela lista as áreas válidas.
 
 ### Task 6: Agentes, callbacks e App
 - **O ADK chama os callbacks pelo nome dos parâmetros** (`flows/llm_flows/tools/_caller.py` e `_error_handler.py`):
@@ -217,6 +216,15 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
   Dê folga aos timeouts do cliente HTTP, e mais ainda se o roteiro usar a alternativa.
 - As contagens de chamadas do spike vêm das tools mínimas dele e não servem de estimativa de cota.
 - Se o `gemini-3.5-flash-lite` errar chamadas de tool de forma recorrente, o critério da D8 manda usar o `gemini-3.8-flash`. Avise o usuário.
+- O enunciado procura o 302 isolado **só nas respostas** do passo 10. Nos eventos, procura `RSV-4821` e `Marina Duarte`. Se o
+  roteiro também varrer eventos atrás do 302, aplique a mesma máscara de ids do ADK de `tests/apoio.py::sem_vazamento` (Ruling 25):
+  uuids e `call_<n>` casam o regex por acaso.
+- **Pontos fracos das instruções a observar com o modelo real** (achados menores da revisão da Task 6; as frases de correção estão
+  no ledger): o especialista perguntar "Deseja confirmar?" depois de ver a data livre, em vez de chamar `reservar_area`; o
+  especialista do regulamento escrever a pergunta reescrita como texto e perder o "20h" do passo 12; o "pode liberar direto" do
+  passo 11; repetir o 302 que o morador alega no passo 3. Se algum aparecer, corrija a instrução e rode de novo só o passo.
+- A suíte de integração (`tests/integracao/`) já prova sem cota o reinício, o `409`, a disputa, o roteamento e o isolamento. Uma
+  falha no roteiro real que a suíte não pega costuma ser instrução ou modelo, não código.
 
 ### Task 11: README da entrega
 - Copie o enunciado para `docs/enunciado.md` **com Python** (o plano traz o comando). O redirecionamento do PowerShell muda a codificação.
@@ -276,5 +284,17 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
   - Task 3 (`a91001e`, `52560ab`): banco, repositório e restauração; uma rodada de correção para a subida recarregar um banco vazio.
   - Task 4 (`772e9ce`): carga do regulamento (14 capítulos, 96 artigos, LF e CRLF) e busca por um capítulo só.
   - Task 5 (`49ed447`): as sete tools e as funções de confirmação; o revisor (opus) sondou G1 e G2 pelo caminho real do ADK.
-  - Rulings 11 a 18 no ledger. Suíte: 88 passed.
+  - Rulings 11 a 18 no ledger. Suíte: 88 passed (na época).
   - Próximo passo: **Task 6 (agentes, callbacks e App)**, início da sessão 3 da seção 7 (Tasks 6 a 9).
+- **2026-10-20, correção pontual e Tasks 6 a 9** (mesma sessão; o usuário pediu a correção antes e autorizou as quatro tasks, cada uma
+  validada por um revisor subagente).
+  - Correção (`c25666b`): a mensagem de área inválida não repete o valor do modelo (Ruling 19).
+  - Task 6 (`1cb8a35`, `a614edc`): agentes, callbacks e App; instruções sem marcadores de state (Ruling 20); o callback de erro deixa o
+    ADK responder uma tool inexistente (Ruling 21).
+  - Task 7 (`489ec1f`): pendências derivadas dos eventos e montagem da resposta, conferidas contra os formatos reais do spike.
+  - Task 8 (`39e1b4d`, `705e1d6`): API FastAPI; o `.env` só é carregado no caminho de produção (Ruling 22); filtro do aviso do Starlette
+    (Ruling 23). O teste de fumaça chamou o Gemini real (umas três chamadas), o que eu tinha dito que não aconteceria nestas tasks.
+  - Task 9 (`5328874`, `ed18730`): suíte de integração pela pilha real com o modelo roteirizado; nenhum bug de integração; a checagem
+    de vazamento ignora ids do ADK (Ruling 25).
+  - Rulings 19 a 25 no ledger. Suíte: 146 passed.
+  - Próximo passo: **Task 10 (roteiro do avaliador com o modelo real)**, início da sessão 4 da seção 7 (Tasks 10 a 12).
