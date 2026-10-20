@@ -27,7 +27,7 @@ parecer contradizer o enunciado, **pare e pergunte ao usuário**.
 
 ## 3. Estado atual
 
-_Atualizado em 2026-10-20, depois das Tasks 10 e 11 e da revisão final da branch. Falta só a Task 12, que depende do usuário._
+_Atualizado em 2026-10-20, depois da Task 12. O plano está concluído e a entrega está na `main`._
 
 | Task | Descrição | Status | Commit / observação |
 |---|---|---|---|
@@ -43,7 +43,7 @@ _Atualizado em 2026-10-20, depois das Tasks 10 e 11 e da revisão final da branc
 | 9 | Suíte de integração (pilha real, Gemini falso) | **concluída** | `5328874` e `ed18730` (correção da revisão: a checagem de vazamento ignora ids do ADK) |
 | 10 | Roteiro do avaliador (modelo real) | **concluída** | `2f25c93`, `9518cad` e `8aa7822`; 3 rodadas seguidas em PASS |
 | 11 | README da entrega | **concluída** | `f176c1d` e `0757695`; `--so-readme` em PASS |
-| 12 | Finalização (merge e push, com autorização) | **aguarda o usuário** | revisão final feita; correções em `f2e9f75`..`8f5785c`; passo 8 em `5b05e59` |
+| 12 | Finalização (merge e push, com autorização) | **concluída** | merge por avanço de ponteiro na `main` em `0f65377` e push, autorizados pelo usuário |
 
 **Estado do repositório:**
 - Branch de trabalho: `feat/assistente-aurora`, criada a partir de `main` (`be87e1d`). A `main` continua intacta.
@@ -325,3 +325,7 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
   decidiu manter o `HANDOFF.md` no repositório entregue. Sugestão do coordenador para a integração: merge local na `main` por
   avanço de ponteiro (a `main` continua em `be87e1d`), suíte sobre o resultado, push da `main` e, se o usuário quiser, apagar a
   branch de feature local e remota. Aguarda a autorização explícita do usuário.
+- **2026-10-20, Task 12.** Com autorização explícita do usuário: merge por avanço de ponteiro da `feat/assistente-aurora` na `main`
+  (`be87e1d`..`0f65377`), suíte sobre o resultado (152 passed, `--so-readme` em PASS, `dados/` intacto) e push da `main`. A branch
+  de feature foi mantida, local e no `origin` (lá ainda em `d214d2a`). O ledger da execução, fora do Git, continua em
+  `.superpowers/sdd/2026-10-19-assistente-aurora/progress.md`, com todas as rulings e os achados menores adiados.
