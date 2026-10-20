@@ -23,6 +23,8 @@ TEXTO_AVISO_FALHA = (
     "Confira suas reservas e visitantes."
 )
 _STATUS_COM_EFEITO = {"criada", "cancelada", "autorizado"}
+# Início do `error` que o FunctionTool do ADK devolve ao criar a pendência.
+_PEDIDO_DE_CONFIRMACAO = "This tool call requires confirmation"
 
 
 @dataclass(frozen=True)
@@ -117,10 +119,19 @@ def encontrar_pendente(
     return next((p for p in listar_pendentes(eventos, areas) if p.id == id), None)
 
 
+def _pede_confirmacao(resposta: object) -> bool:
+    erro = _dict(resposta).get("error")
+    return isinstance(erro, str) and erro.startswith(_PEDIDO_DE_CONFIRMACAO)
+
+
 def acao_executada(eventos_emitidos: Sequence[Event], id_chamada_original: str) -> bool:
-    """A tool respondeu à chamada original num evento que não é do usuário."""
+    """A chamada original recebeu a resposta da tool, de execução ou de negação.
+
+    Só contam eventos que não são do usuário. O aviso do ADK de que a chamada pede
+    confirmação também não conta: ele só cria a pendência.
+    """
     return any(
-        r.id == id_chamada_original
+        r.id == id_chamada_original and not _pede_confirmacao(r.response)
         for e in eventos_emitidos
         if e.author != "user"
         for r in _respostas(e)

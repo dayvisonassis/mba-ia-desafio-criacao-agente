@@ -115,6 +115,13 @@ def test_acao_executada():
     assert not acao_executada([ev_resposta_usuario("c1", True)], "o1")
 
 
+def test_acao_executada_ignora_o_pedido_de_confirmacao():
+    pedido = ev_resposta_tool("o1", "reservar_area", REQ, skip=True)
+    assert not acao_executada([pedido], "o1")
+    negada = ev_resposta_tool("o1", "reservar_area", {"status": "negada", "mensagem": "Tudo bem, nada foi feito."}, skip=True)
+    assert acao_executada([pedido, negada], "o1")
+
+
 def test_houve_efeito():
     assert houve_efeito([ev_resposta_tool("o1", "reservar_area", {"status": "criada"})])
     assert not houve_efeito([ev_resposta_tool("o1", "reservar_area", {"status": "nao_confirmada"})])
