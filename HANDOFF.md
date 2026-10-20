@@ -27,7 +27,7 @@ parecer contradizer o enunciado, **pare e pergunte ao usuário**.
 
 ## 3. Estado atual
 
-_Atualizado em 2026-10-20, depois da Task 9._
+_Atualizado em 2026-10-20, depois das Tasks 10 e 11 e da revisão final da branch. Falta só a Task 12, que depende do usuário._
 
 | Task | Descrição | Status | Commit / observação |
 |---|---|---|---|
@@ -41,15 +41,22 @@ _Atualizado em 2026-10-20, depois da Task 9._
 | 7 | Pendências e montagem da resposta | **concluída** | `489ec1f`; revisão aprovada |
 | 8 | API e servidor | **concluída** | `39e1b4d` e `705e1d6` (filtro do aviso do Starlette); fumaça com o modelo real OK |
 | 9 | Suíte de integração (pilha real, Gemini falso) | **concluída** | `5328874` e `ed18730` (correção da revisão: a checagem de vazamento ignora ids do ADK) |
-| 10 | Roteiro do avaliador (modelo real) | pendente | |
-| 11 | README da entrega | pendente | |
-| 12 | Finalização (merge e push, com autorização) | pendente | |
+| 10 | Roteiro do avaliador (modelo real) | **concluída** | `2f25c93`, `9518cad` e `8aa7822`; 3 rodadas seguidas em PASS |
+| 11 | README da entrega | **concluída** | `f176c1d` e `0757695`; `--so-readme` em PASS |
+| 12 | Finalização (merge e push, com autorização) | **aguarda o usuário** | revisão final feita; correções em `f2e9f75`..`8f5785c` |
 
 **Estado do repositório:**
 - Branch de trabalho: `feat/assistente-aurora`, criada a partir de `main` (`be87e1d`). A `main` continua intacta.
 - `uv` 0.13.3 instalado em `C:\Users\dayvi\.local\bin`. Em shells abertos antes da instalação ele não está no PATH: use
   `export PATH="$HOME/.local/bin:$PATH"` (Bash) ou `$env:Path = "$env:USERPROFILE\.local\bin;$env:Path"` (PowerShell).
-- `.venv` com Python 3.12.15 e `google-adk` 2.12.0. `uv run pytest`: 146 passed. Rode sem `-W error` (ver Task 5 na seção 6).
+- `.venv` com Python 3.12.15 e `google-adk` 2.12.0. `uv run pytest`: 151 passed. Rode sem `-W error` (ver Task 5 na seção 6).
+- **Revisão final da branch** (Opus): "pronta para merge com correções". As correções vieram numa rodada única
+  (`f2e9f75`..`8f5785c`): novas tentativas de ~90 s para o limite por minuto, exemplo neutro de horário na instrução do
+  regulamento, endurecimento de `acao_executada`, hífen em `validar_area`, `executescript`, `.gitignore` com `.env.*` e
+  precisão do README. O roteiro passou de novo 3 vezes seguidas (159 checagens). Nenhum achado menor adiado precisa
+  de correção antes do merge, segundo a triagem da revisão final.
+- `origin/feat/assistente-aurora` existe em `d214d2a` (enviado antes da sessão de 2026-10-20). A branch local está à frente,
+  e nada foi enviado depois disso.
 - `var/aurora.db` existe, criado pelo `uv run restaurar` da Task 3, e é ignorado pelo Git.
 - Achados menores adiados, para a revisão final triar, estão no ledger `.superpowers/sdd/2026-10-19-assistente-aurora/progress.md`
   (linhas `minor (deferred)`). A correção que estava marcada para antes do merge (a mensagem `invalida` repetia o argumento
@@ -208,7 +215,8 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
 - O `httpx.ASGITransport` não roda o lifespan da API, então a fixture cria o esquema e os dados ela mesma.
 
 ### Task 10: Roteiro do avaliador
-- Usa o modelo real, com algumas dezenas de chamadas. Rode com a API em subprocesso e, no Windows, encerre com `terminate()`.
+- Usa o modelo real, com algumas dezenas de chamadas. Rode com a API em subprocesso. No Windows, `terminate()` mata só o `uv.exe` e deixa o
+  servidor escutando: encerre a árvore com `taskkill /PID <pid> /T /F` e confira que a porta ficou livre (o roteiro já faz isso).
 - O roteiro reproduz **cada verificação** do "Fluxo do avaliador" do enunciado. "302 isolado" usa o regex `(?<!\d)302(?!\d)`.
 - Uma falha aqui pede `superpowers:systematic-debugging` e um teste que reproduza a falha na task dona do código.
 - Latência medida no spike, com faturamento: `gemini-3.5-flash-lite` com mediana de 0,9 s e máximo de 1,5 s; `gemini-3.8-flash` com mediana
@@ -219,6 +227,9 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
 - O enunciado procura o 302 isolado **só nas respostas** do passo 10. Nos eventos, procura `RSV-4821` e `Marina Duarte`. Se o
   roteiro também varrer eventos atrás do 302, aplique a mesma máscara de ids do ADK de `tests/apoio.py::sem_vazamento` (Ruling 25):
   uuids e `call_<n>` casam o regex por acaso.
+- **Observado nas rodadas:** a regra (d), não repetir o apartamento alegado, foi aplicada em `9518cad`. Em 2 das 3 rodadas
+  finais, no passo 8 (repetir o pedido negado no passo 7), o especialista de reservas respondeu com texto em vez de chamar
+  `reservar_area`; o "Sim, pode seguir." resolveu. É variação do modelo, levada ao usuário como resíduo da revisão final.
 - **Pontos fracos das instruções a observar com o modelo real** (achados menores da revisão da Task 6; as frases de correção estão
   no ledger): o especialista perguntar "Deseja confirmar?" depois de ver a data livre, em vez de chamar `reservar_area`; o
   especialista do regulamento escrever a pergunta reescrita como texto e perder o "20h" do passo 12; o "pode liberar direto" do
@@ -298,3 +309,14 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
     de vazamento ignora ids do ADK (Ruling 25).
   - Rulings 19 a 25 no ledger. Suíte: 146 passed.
   - Próximo passo: **Task 10 (roteiro do avaliador com o modelo real)**, início da sessão 4 da seção 7 (Tasks 10 a 12).
+- **2026-10-20, Tasks 10 e 11 e revisão final** (mesma sessão; o usuário autorizou as Tasks 10 e 11 e pediu para parar antes do
+  merge e do push).
+  - Task 10: roteiro do avaliador com o modelo real; a revisão achou 4 checagens que podiam passar vazias, corrigidas; a regra (d)
+    das instruções foi aplicada; 3 rodadas seguidas em PASS (Rulings 26 a 29).
+  - Task 11: README da entrega e `docs/enunciado.md`; 43 referências e 16 trechos conferidos; duas frases corrigidas.
+  - Revisão final da branch (Opus): pronta com correções; rodada única de correção F1 a F7 (Rulings 30 e 31), revisada; o roteiro
+    passou 3 vezes seguidas de novo. Suíte: 151 passed.
+  - O usuário perguntou por que os subagentes não rodavam mais todos no Opus: a skill de execução manda escolher o modelo pelo
+    papel (Haiku, Sonnet ou Opus). Ficou em aberto se ele prefere Opus em tudo.
+  - Próximo passo: **Task 12**, com três decisões do usuário: o resíduo do passo 8 (aplicar ou não uma frase na instrução de
+    reservas), se o `HANDOFF.md` fica no repositório entregue, e a autorização do merge na `main` e do push.
