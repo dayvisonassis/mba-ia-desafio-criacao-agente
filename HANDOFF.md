@@ -27,16 +27,16 @@ parecer contradizer o enunciado, **pare e pergunte ao usuário**.
 
 ## 3. Estado atual
 
-_Atualizado em 2026-10-20, depois da Task 1._
+_Atualizado em 2026-10-20, depois da Task 5._
 
 | Task | Descrição | Status | Commit / observação |
 |---|---|---|---|
 | 0 | Ambiente e esqueleto (`uv`, `pyproject`, ADK 2.12.0) | **concluída** | `32225f3` (docs) e `04ed34a` (esqueleto); revisão aprovada |
 | 1 | Spike de confirmação (porta de decisão) | **concluída** | `07a11c8`; nenhum `FAIL` nos dois modelos; D8 revisada (padrão `gemini-3.5-flash-lite`) |
-| 2 | Configuração e validação | pendente | |
-| 3 | Banco, repositório e restauração | pendente | |
-| 4 | Regulamento: carga e busca | pendente | |
-| 5 | Ferramentas (tools) | pendente | |
+| 2 | Configuração e validação | **concluída** | `e85ee26`; revisão aprovada |
+| 3 | Banco, repositório e restauração | **concluída** | `a91001e` e `52560ab` (correção da revisão: a subida recarrega um banco sem dados) |
+| 4 | Regulamento: carga e busca | **concluída** | `772e9ce`; revisão aprovada |
+| 5 | Ferramentas (tools) | **concluída** | `49ed447`; revisão aprovada (G1 e G2 sondadas pelo caminho real do ADK) |
 | 6 | Agentes, callbacks e App | pendente | |
 | 7 | Pendências e montagem da resposta | pendente | |
 | 8 | API e servidor | pendente | |
@@ -49,7 +49,11 @@ _Atualizado em 2026-10-20, depois da Task 1._
 - Branch de trabalho: `feat/assistente-aurora`, criada a partir de `main` (`be87e1d`). A `main` continua intacta.
 - `uv` 0.13.3 instalado em `C:\Users\dayvi\.local\bin`. Em shells abertos antes da instalação ele não está no PATH: use
   `export PATH="$HOME/.local/bin:$PATH"` (Bash) ou `$env:Path = "$env:USERPROFILE\.local\bin;$env:Path"` (PowerShell).
-- `.venv` com Python 3.12.15 e `google-adk` 2.12.0. `uv run pytest`: 1 passed.
+- `.venv` com Python 3.12.15 e `google-adk` 2.12.0. `uv run pytest`: 88 passed. Rode sem `-W error` (ver Task 5 na seção 6).
+- `var/aurora.db` existe, criado pelo `uv run restaurar` da Task 3, e é ignorado pelo Git.
+- Achados menores adiados, para a revisão final triar, estão no ledger `.superpowers/sdd/2026-10-19-assistente-aurora/progress.md`
+  (linhas `minor (deferred)`). Um deles deve ser corrigido antes do merge: a mensagem `invalida` repete o argumento cru do
+  modelo (Task 5, abaixo).
 - A chave do projeto tem faturamento ativo (Tier 1) desde 2026-10-20. O spike inteiro, nos dois modelos, custou menos de US$ 0,10.
 - O resultado do spike está no fim do plano ("Resultado do spike"). A pasta `spike/` foi apagada, como manda a Task 1.
 - O `.env` existe, com a `GOOGLE_API_KEY`, e é ignorado pelo Git.
@@ -130,10 +134,15 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
   `codigos_emitidos.codigo` pede um novo código.
 - A restauração apaga e recarrega `reservas`, `visitantes`, `areas` e `apartamentos`, nessa ordem por causa das FKs, mas
   **nunca** `codigos_emitidos` nem `sessoes`. Os JSON são lidos com `encoding="utf-8"`.
+- **Feito:** `restaurar.main()` carrega o `.env` antes de tudo, como a API fará, para os dois usarem a mesma pasta (Ruling 14).
+  `inicializar_se_necessario` só considera o banco pronto se a tabela `apartamentos` tiver linhas; um banco vazio é recarregado (Ruling 15).
+- Nesta máquina, `core.autocrlf=true`: `dados/` está em LF no Git e em CRLF na cópia de trabalho. O código aceita os dois.
 
 ### Task 4: Regulamento
 - O arquivo tem 14 capítulos e 96 artigos. A frase da piscina está na linha 157: "Aos domingos e feriados, a piscina funciona das 9h às 20h."
-- A busca devolve artigos de **um único** capítulo.
+- A busca devolve artigos de **um único** capítulo. Sem nenhum termo em comum, devolve `("", [])` (Ruling 16).
+- **Limite conhecido:** a busca é por palavras e a pontuação soma os artigos do capítulo, então sinônimos e capítulos longos
+  confundem ("posso levar meu cachorro no elevador" cai em Mudanças). A pergunta do avaliador (piscina) acerta. Ver Task 6.
 - O spike confirmou a chave do limite da D19: o `tool_context.session.id` da sessão filha é o mesmo em toda a execução do
   especialista e muda a cada chamada do `AgentTool`.
 
@@ -146,7 +155,12 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
 - Para os testes: a função original fica em `FunctionTool.func`, e `check_require_confirmation` é async (use `asyncio.run`).
 - O spike contou as chamadas à função de `require_confirmation`: 1 ao criar a pendência, 2 numa área sem taxa, 2 na negação e 3 na aprovação.
 - **Ruling 9:** o spike provou a via por função só em `reservar_area` (o visitante usou `require_confirmation=True`). Os testes desta
-  task precisam passar `precisa_confirmar_visitante` pelo `FunctionTool`, e a Task 9 pela pilha completa.
+  task precisam passar `precisa_confirmar_visitante` pelo `FunctionTool`, e a Task 9 pela pilha completa. **Feito** na Task 5.
+- `buscar_no_regulamento` não exige o apartamento, porque não lê dado de apartamento (Ruling 17).
+- O ADK emite um `UserWarning` "[EXPERIMENTAL] feature FeatureName.TOOL_CONFIRMATION" a cada uso da confirmação. O
+  `pyproject.toml` ignora só esse aviso (Ruling 18). O `-W error` da linha de comando sobrepõe esse filtro: use `uv run pytest`.
+- **Corrigir antes do merge:** a resposta `invalida` repete o argumento cru do modelo ("Área desconhecida: '302'.",
+  `validacao.py` + `ferramentas.py`). Se o modelo puser "302" em `area`, a resposta terá um 302 isolado (passo 10).
 
 ### Task 6: Agentes, callbacks e App
 - **O ADK chama os callbacks pelo nome dos parâmetros** (`flows/llm_flows/tools/_caller.py` e `_error_handler.py`):
@@ -163,6 +177,11 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
 - `criar_app(modelo=None)`: a injeção do modelo existe só para a suíte de integração (D24).
 - Com o `gemini-3.5-flash-lite`, o pedido de duas reservas numa mensagem gerou uma só chamada, sem avisar da segunda. A instrução do
   especialista de reservas deve pedir que ele diga quando deixa parte do pedido para depois (como a D14 já pede para dois assuntos).
+- O `on_tool_error_callback` devolve `{status: "erro", mensagem}` **sem detalhes internos**: a mensagem do `ConflitoDeChamada`
+  contém o `chamada_id`, e a do `RuntimeError` diz "Sessão sem apartamento.".
+- Não ligue `RunConfig.tool_thread_pool_config`: o `RegistroBuscas` só é atômico porque as tools síncronas rodam no próprio loop.
+- A instrução do especialista do regulamento deve mandar reescrever a pergunta com o vocabulário do regulamento ("animais",
+  "garagem", "visitantes"), porque a busca é por palavras (Task 4).
 
 ### Task 7: Pendências e resposta
 - O evento de confirmação é um `function_call` `adk_request_confirmation` com `args.originalFunctionCall` (`id`, `name`, `args`).
@@ -251,3 +270,11 @@ do `uv sync`. A cópia lida na sessão de planejamento ficava numa pasta tempor�
   - A revisão da task aprovou a fidelidade ao design e pediu só ajustes de texto, feitos numa rodada. Um achado mandado pelo plano virou a
     Ruling 9 (cobertura da função de confirmação de visitante nas Tasks 5 e 9). Commit `07a11c8`, e `spike/` apagado.
   - Próximo passo: **Task 2 (configuração e validação)**, início da sessão 2 da seção 7 (Tasks 2 a 5).
+- **2026-10-20, Tasks 2 a 5** (mesma sessão da Task 1; o usuário autorizou as quatro, cada uma validada por um revisor subagente).
+  - Task 2 (`e85ee26`): configuração e validação; `carregar_ambiente(caminho)` com a exceção do `AURORA_DIR_VAR` (Ruling 3) e testes
+    que nunca leem o `.env` real (Ruling 11).
+  - Task 3 (`a91001e`, `52560ab`): banco, repositório e restauração; uma rodada de correção para a subida recarregar um banco vazio.
+  - Task 4 (`772e9ce`): carga do regulamento (14 capítulos, 96 artigos, LF e CRLF) e busca por um capítulo só.
+  - Task 5 (`49ed447`): as sete tools e as funções de confirmação; o revisor (opus) sondou G1 e G2 pelo caminho real do ADK.
+  - Rulings 11 a 18 no ledger. Suíte: 88 passed.
+  - Próximo passo: **Task 6 (agentes, callbacks e App)**, início da sessão 3 da seção 7 (Tasks 6 a 9).
