@@ -60,7 +60,8 @@ ADK e usam o mesmo modelo Gemini, com novas tentativas automáticas para os erro
 - **Responsabilidade:** listar e autorizar os visitantes do apartamento da sessão. As tools são `listar_meus_visitantes`
   e `autorizar_visitante` (`src/aurora/ferramentas.py::FERRAMENTAS_VISITANTES`).
 - **Como é acionado:** por transferência, como o de reservas.
-- **Por quê:** `autorizar_visitante` sempre pede confirmação, então vale o mesmo motivo do especialista de reservas.
+- **Por quê:** `autorizar_visitante` pede confirmação sempre que o nome e a data são válidos, então vale o mesmo motivo do
+  especialista de reservas.
 
 #### `especialista_regulamento` (ferramenta, via `AgentTool`)
 
@@ -87,8 +88,8 @@ ADK e usam o mesmo modelo Gemini, com novas tentativas automáticas para os erro
   transferir. Se ele não puder, a mensagem vai ao principal. Com o bloqueio, toda mensagem de texto começa no principal, e a
   pergunta sobre a piscina nunca fica presa no especialista de visitantes. A aprovação não depende disso: ela vai ao autor
   da chamada pelo nome, mesmo que ele não possa transferir. O custo é cerca de uma chamada a mais ao modelo por mensagem.
-  Numa mensagem com dois assuntos, o especialista do primeiro atende a parte dele e diz que o outro assunto pode ser pedido
-  em seguida.
+  Numa mensagem com dois assuntos, a instrução pede que o especialista do primeiro atenda a parte dele e diga que o outro
+  assunto pode ser pedido em seguida.
 - **O App não usa `ResumabilityConfig`.** Com a retomada ligada, o ADK também mandaria ao especialista a mensagem de texto
   seguinte a uma aprovação, e ela deixaria de começar no principal.
 - **`AgentTool`, e não `mode="single_turn"`.** A documentação do `AgentTool` no ADK desencoraja o uso direto e sugere um
@@ -123,12 +124,13 @@ A API (`src/aurora/api.py::criar_api`) segue o contrato do enunciado:
 Outros pontos:
 
 - A rota de mensagens aceita só texto. Só a rota de confirmações monta a resposta que o ADK espera para uma confirmação.
-- Um `asyncio.Lock` por sessão serializa as mensagens e as confirmações da mesma sessão. Sessões diferentes rodam em
-  paralelo.
+- Um `asyncio.Lock` por sessão serializa as mensagens e as confirmações da mesma sessão. Sessões diferentes têm travas
+  diferentes e rodam de forma concorrente, no mesmo loop de eventos: uma não espera a outra terminar.
 - `confirmacoes_pendentes` é calculada a cada resposta a partir dos eventos gravados
   (`src/aurora/confirmacoes.py::listar_pendentes`).
 - Fora do contrato: `422` para apartamento inexistente na criação da sessão ou para texto vazio; `503` quando o modelo
-  falha antes de qualquer efeito; `500` se uma aprovação não chegar à tool.
+  falha antes de qualquer efeito; `500` na rota de confirmações quando a aprovação ou a negação não chega à tool, ou quando
+  o Runner lança uma exceção.
 
 ### Arquivos
 
@@ -150,8 +152,9 @@ Outros pontos:
 
 ## Garantias
 
-Cada garantia aponta as funções que a implementam, no formato `caminho::nome`, e mostra trechos do código. Algumas
-funções da API, como a rota `responder_confirmacao` e o helper `trava`, ficam dentro de `criar_api`. O comando
+Cada garantia aponta as funções e constantes que a implementam, no formato `caminho::nome`, e mostra trechos do código.
+As quatro funções da API citadas aqui ficam dentro de `criar_api`: as rotas `criar_sessao` e `responder_confirmacao` e
+os helpers `carregar_sessao` e `trava`. O comando
 `uv run python scripts/roteiro_avaliador.py --so-readme` confere que todas as referências deste README existem.
 
 ### 1. Cobrança ou acesso só com confirmação
@@ -163,14 +166,15 @@ funções da API, como a rota `responder_confirmacao` e o helper `trava`, ficam 
   `src/aurora/ferramentas.py::FERRAMENTAS_VISITANTES`. A da reserva pede confirmação só quando a área tem taxa maior que
   zero no banco. A do visitante pede sempre que o nome e a data são válidos.
 - `src/aurora/ferramentas.py::reservar_area` e `src/aurora/ferramentas.py::autorizar_visitante`: a segunda verificação,
-  no corpo da tool, com `src/aurora/ferramentas.py::_aprovada`. Sem aprovação, a tool não grava.
+  no corpo da tool, com `src/aurora/ferramentas.py::_aprovada`. Sem aprovação, a tool não grava a reserva com taxa nem o
+  visitante.
 - `src/aurora/agentes.py::depois_da_tool_especialista`: depois de aprovar ou negar, encerra o turno sem nova chamada ao
   modelo. Na negação, troca a resposta por "Tudo bem, nada foi feito."
 - `src/aurora/confirmacoes.py::listar_pendentes` e `src/aurora/confirmacoes.py::encontrar_pendente`: as pendências são
   os eventos `adk_request_confirmation` da sessão que ainda não têm resposta.
 - `src/aurora/api.py::responder_confirmacao`: responde `409` antes de rodar o Runner quando o `id` não está pendente.
-  Depois de rodar, confere com `src/aurora/confirmacoes.py::acao_executada` que a tool executou. Se não executou,
-  responde `500` em vez de um `200` enganoso.
+  Depois de rodar, confere com `src/aurora/confirmacoes.py::acao_executada` que a chamada original recebeu a resposta
+  da tool, de execução ou de negação. Se não recebeu, responde `500` em vez de um `200` enganoso.
 - `src/aurora/banco.py::ESQUEMA_SQL`: a coluna `chamada_id TEXT UNIQUE` em `reservas` e `visitantes`.
   `src/aurora/repositorio.py::criar_reserva` e `src/aurora/repositorio.py::autorizar_visitante` procuram esse id antes
   de gravar e, se ele já existir, devolvem o registro gravado.
@@ -493,7 +497,7 @@ copy .env.example .env
 Depois preencha `GOOGLE_API_KEY` no `.env`. Sem essa chave, a API sobe e as rotas de verificação respondem, mas o modelo
 não pode ser chamado, e a rota de mensagens responde `503`.
 
-O `.env.example` traz só os nomes:
+O `.env.example` traz os nomes, sem valores:
 
 ```
 GOOGLE_API_KEY=
@@ -507,8 +511,9 @@ AURORA_DIR_VAR=
 | `GEMINI_MODELO` | Não | Modelo Gemini dos quatro agentes. Vazia, vale `gemini-3.5-flash-lite`. |
 | `AURORA_DIR_VAR` | Não | Pasta dos bancos SQLite. Vazia, vale `<raiz>/var`. |
 
-- Os valores do `.env` substituem variáveis de mesmo nome do ambiente. A exceção é `AURORA_DIR_VAR` quando ela já está
-  definida no processo, o que os testes usam. O projeto também força o AI Studio com `GOOGLE_GENAI_USE_VERTEXAI=FALSE`.
+- A `GOOGLE_API_KEY` e o `GEMINI_MODELO` do `.env` substituem as variáveis de mesmo nome do ambiente, mesmo quando estão
+  vazios. Por isso preencha a `GOOGLE_API_KEY` no próprio `.env`: vazia, ela substitui uma chave definida no ambiente
+  global. O projeto também força o AI Studio com `GOOGLE_GENAI_USE_VERTEXAI=FALSE`.
 - **Modelo e cota.** O fluxo do avaliador faz algumas dezenas de chamadas ao modelo. Confira os limites do seu projeto no
   Google AI Studio.
   - O padrão é o `gemini-3.5-flash-lite`. Nos testes do projeto, ele não teve falhas e custou menos e respondeu mais
@@ -517,8 +522,6 @@ AURORA_DIR_VAR=
   - Se a cota acabar (erro `429` mesmo depois das novas tentativas) ou se o modelo padrão errar chamadas de tool com
     frequência, preencha `GEMINI_MODELO` com `gemini-3.8-flash`, a alternativa. Reinicie a API depois de mudar o `.env`.
   - Atenção: no plano gratuito, o `gemini-3.8-flash` tem só 20 requisições por dia, menos do que o fluxo do avaliador usa.
-  - O `gemini-2.5-flash` aparece na listagem de modelos, mas respondeu `404` ("no longer available to new users") para a
-    chave usada no projeto.
 
 ### Restaurar os dados
 
@@ -540,6 +543,7 @@ uv run api
 ```
 
 - Serve em `http://localhost:8000`, escutando em `127.0.0.1:8000`, sem recarga automática. Para parar, use Ctrl+C.
+- O comando ocupa o terminal. Rode o `curl` e o `uv run restaurar` em outro terminal.
 - Na primeira subida, se `var/aurora.db` não existir ou estiver vazio, a API carrega os dados de `dados/`. Se o banco já
   tiver dados, ela não muda nada. Reiniciar com o mesmo comando não perde sessões nem dados.
 - Para conferir, `curl http://localhost:8000/apartamentos/101/reservas` deve listar a `RSV-1377`. No PowerShell 5.1, use
@@ -563,8 +567,8 @@ uv run python scripts/roteiro_avaliador.py
 ```
 
 - Reproduz os passos 1 a 14 do fluxo do avaliador contra a API, com o modelo real, e confere cada verificação. Também faz
-  as checagens de repositório do passo 15: `dados/` igual ao do commit `be87e1d`, `.env` fora do Git, `.env.example` sem
-  valores, versão do ADK fixada, nenhuma chave versionada e as referências da seção Garantias.
+  parte das checagens de repositório do passo 15: `dados/` igual ao do commit `be87e1d`, `.env` fora do Git,
+  `.env.example` sem valores, versão do ADK fixada, nenhuma chave versionada e as referências da seção Garantias.
 - Pare a sua API antes. O roteiro roda `uv run restaurar`, sobe a própria API na porta 8000 e a reinicia no passo 13. A
   restauração desfaz as reservas e os visitantes criados antes.
 - Gasta algumas dezenas de chamadas ao modelo, com a chave do `.env`.
